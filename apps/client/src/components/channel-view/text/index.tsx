@@ -1,11 +1,13 @@
 import { TiptapInput } from '@/components/tiptap-input';
 import Spinner from '@/components/ui/spinner';
 import { useMessages } from '@/features/server/messages/hooks';
+import { parseTrpcErrors } from '@/helpers/parse-trpc-errors';
 import { useUploadFiles } from '@/hooks/use-upload-files';
 import { getTRPCClient } from '@/lib/trpc';
 import { filesize } from 'filesize';
 import { Send } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '../../ui/button';
 import { FileCard } from './file-card';
 import { MessagesGroup } from './messages-group';
@@ -29,11 +31,18 @@ const TextChannel = memo(({ channelId }: TChannelProps) => {
 
     const trpc = getTRPCClient();
 
-    await trpc.messages.send.mutate({
-      content: newMessage,
-      channelId,
-      files: files.map((f) => f.id)
-    });
+    try {
+      await trpc.messages.send.mutate({
+        content: newMessage,
+        channelId,
+        files: files.map((f) => f.id)
+      });
+    } catch (error) {
+      const { _general } = parseTrpcErrors(error);
+
+      toast.error(_general || 'Failed to send message');
+      return;
+    }
 
     setNewMessage('');
     clearFiles();

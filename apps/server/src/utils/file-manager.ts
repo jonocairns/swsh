@@ -1,4 +1,8 @@
-import type { TFile, TTempFile } from '@sharkord/shared';
+import {
+  StorageOverflowAction,
+  type TFile,
+  type TTempFile
+} from '@sharkord/shared';
 import { randomUUIDv7 } from 'bun';
 import { createHash } from 'crypto';
 import { parse } from 'file-type-mime';
@@ -6,6 +10,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import { createFile } from '../db/mutations/files/create-file';
 import { getUniqueFileId } from '../db/mutations/files/get-unique-file-id';
+import { removeFile } from '../db/mutations/files/remove-file';
+import { getExceedingOldFiles } from '../db/queries/files/get-exeeding-old-files';
+import { getUsedFileQuota } from '../db/queries/files/get-used-file-quota';
+import { getSettings } from '../db/queries/others/get-settings';
+import { getStorageUsageByUserId } from '../db/queries/users/get-storage-usage-by-user-id';
 import { PUBLIC_PATH, TMP_PATH, UPLOADS_PATH } from '../helpers/paths';
 
 const TEMP_FILE_TTL = 1000 * 60 * 1; // 1 minute
@@ -113,6 +122,49 @@ class FileManager {
 
   public getTemporaryFile = this.tempFileManager.getTemporaryFile;
 
+  private handleStorageLimits = async (tempFile: TTempFile) => {
+    const [settings, userStorage, serverStorage] = await Promise.all([
+      await getSettings(),
+      await getStorageUsageByUserId(tempFile.userId),
+      await getUsedFileQuota()
+    ]);
+
+    const newTotalStorage = userStorage.usedStorage + tempFile.size;
+
+    if (
+      settings.storageSpaceQuotaByUser > 0 &&
+      newTotalStorage > settings.storageSpaceQuotaByUser
+    ) {
+      throw new Error('User storage limit exceeded');
+    }
+
+    const newServerStorage = serverStorage + tempFile.size;
+
+    if (
+      settings.storageUploadMaxFileSize > 0 &&
+      newServerStorage > settings.storageUploadMaxFileSize
+    ) {
+      if (
+        settings.storageOverflowAction === StorageOverflowAction.PREVENT_UPLOADS
+      ) {
+        throw new Error('Server storage limit exceeded.');
+      }
+
+      if (
+        settings.storageOverflowAction ===
+        StorageOverflowAction.DELETE_OLD_FILES
+      ) {
+        const filesToDelete = await getExceedingOldFiles(tempFile.size);
+
+        const promises = filesToDelete.map(async (file) => {
+          await removeFile(file.id);
+        });
+
+        await Promise.all(promises);
+      }
+    }
+  };
+
   public async saveFile(tempFileId: string, userId: number): Promise<TFile> {
     const tempFile = this.getTemporaryFile(tempFileId);
 
@@ -123,6 +175,8 @@ class FileManager {
     if (tempFile.userId !== userId) {
       throw new Error("You don't have permission to access this file");
     }
+
+    await this.handleStorageLimits(tempFile);
 
     const nextId = await getUniqueFileId();
     const fileName = `${nextId}${tempFile.extension}`;

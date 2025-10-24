@@ -125,7 +125,10 @@ const Connect = memo(() => {
           )}
 
           <div className="flex flex-col gap-2">
-            <Group label="Identity">
+            <Group
+              label="Identity"
+              help="A unique identifier for your account on this server. You can use whatever you like, such as an email address or a username. This won't be shared publicly."
+            >
               <Input {...r('identity')} />
             </Group>
             <Group label="Password">

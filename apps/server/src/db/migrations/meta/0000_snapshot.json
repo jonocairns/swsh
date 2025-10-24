@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d4331ef1-691a-4cdc-8661-872c5b471a99",
+  "id": "bfd61b70-5d1b-43d1-be52-1a8eed847fdf",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "categories": {
@@ -1073,6 +1073,14 @@
           "autoincrement": false,
           "default": true
         },
+        "storageQuota": {
+          "name": "storageQuota",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 107374182400
+        },
         "storageUploadMaxFileSize": {
           "name": "storageUploadMaxFileSize",
           "type": "integer",
@@ -1080,14 +1088,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": 2147483648
-        },
-        "storageUploadMaxFileCount": {
-          "name": "storageUploadMaxFileCount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 100
         },
         "storageSpaceQuotaByUser": {
           "name": "storageSpaceQuotaByUser",

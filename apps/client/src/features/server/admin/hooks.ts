@@ -2,10 +2,10 @@ import { parseTrpcErrors, type TTrpcErrors } from '@/helpers/parse-trpc-errors';
 import { useForm } from '@/hooks/use-form';
 import { getTRPCClient } from '@/lib/trpc';
 import {
-  STORAGE_MAX_FILE_COUNT,
   STORAGE_MAX_FILE_SIZE,
   STORAGE_MAX_QUOTA_PER_USER,
   STORAGE_OVERFLOW_ACTION,
+  STORAGE_QUOTA,
   StorageOverflowAction,
   type TChannel,
   type TDiskMetrics,
@@ -222,8 +222,8 @@ export const useAdminStorage = () => {
       storageOverflowAction: STORAGE_OVERFLOW_ACTION,
       storageSpaceQuotaByUser: STORAGE_MAX_QUOTA_PER_USER,
       storageUploadEnabled: true,
-      storageUploadMaxFileCount: STORAGE_MAX_FILE_COUNT,
-      storageUploadMaxFileSize: STORAGE_MAX_FILE_SIZE
+      storageUploadMaxFileSize: STORAGE_MAX_FILE_SIZE,
+      storageQuota: STORAGE_QUOTA
     });
   const [diskMetrics, setDiskMetrics] = useState<TDiskMetrics | undefined>(
     undefined
@@ -248,7 +248,6 @@ export const useAdminStorage = () => {
       await trpc.others.updateSettings.mutate({
         storageUploadEnabled: values.storageUploadEnabled,
         storageUploadMaxFileSize: values.storageUploadMaxFileSize,
-        storageUploadMaxFileCount: values.storageUploadMaxFileCount,
         storageSpaceQuotaByUser: values.storageSpaceQuotaByUser,
         storageOverflowAction:
           values.storageOverflowAction as StorageOverflowAction
@@ -269,14 +268,17 @@ export const useAdminStorage = () => {
           standard: 'jedec'
         }
       ),
-      storageUploadMaxFileCount: values.storageUploadMaxFileCount,
       storageSpaceQuotaByUser: filesize(
         Number(values.storageSpaceQuotaByUser ?? 0),
         {
           output: 'object',
           standard: 'jedec'
         }
-      )
+      ),
+      storageQuota: filesize(Number(values.storageQuota ?? 0), {
+        output: 'object',
+        standard: 'jedec'
+      })
     };
   }, [values]);
 

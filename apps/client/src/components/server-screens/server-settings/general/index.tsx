@@ -60,6 +60,8 @@ const General = memo(() => {
           />
         </Group>
 
+        <LogoManager logo={logo} refetch={refetch} />
+
         <Group
           label="Allow New Users"
           description="Allow anyone to register and join your server. If disabled, only users you invite can join."
@@ -69,8 +71,6 @@ const General = memo(() => {
             onCheckedChange={(checked) => onChange('allowNewUsers', checked)}
           />
         </Group>
-
-        <LogoManager logo={logo} refetch={refetch} />
 
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={closeServerScreens}>

@@ -1,7 +1,7 @@
 import {
-  STORAGE_MAX_FILE_COUNT,
   STORAGE_MAX_FILE_SIZE,
   STORAGE_MIN_QUOTA_PER_USER,
+  STORAGE_QUOTA,
   StorageOverflowAction,
   type TMessageMetadata
 } from '@sharkord/shared';
@@ -29,12 +29,10 @@ const settings = sqliteTable(
     storageUploadEnabled: integer('storageUploadsEnabled', { mode: 'boolean' })
       .notNull()
       .default(true),
+    storageQuota: integer('storageQuota').notNull().default(STORAGE_QUOTA),
     storageUploadMaxFileSize: integer('storageUploadMaxFileSize')
       .notNull()
       .default(STORAGE_MAX_FILE_SIZE),
-    storageUploadMaxFileCount: integer('storageUploadMaxFileCount')
-      .notNull()
-      .default(STORAGE_MAX_FILE_COUNT),
     storageSpaceQuotaByUser: integer('storageSpaceQuotaByUser')
       .notNull()
       .default(STORAGE_MIN_QUOTA_PER_USER),

@@ -48,8 +48,8 @@ export type TIMessageReaction = InferInsertModel<typeof messageReactions>;
 export type TStorageSettings = Pick<
   TSettings,
   | "storageUploadEnabled"
+  | "storageQuota"
   | "storageUploadMaxFileSize"
-  | "storageUploadMaxFileCount"
   | "storageSpaceQuotaByUser"
   | "storageOverflowAction"
 >;

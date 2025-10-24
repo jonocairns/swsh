@@ -13,7 +13,6 @@ const updateSettingsRoute = protectedProcedure
       allowNewUsers: z.boolean().optional(),
       storageUploadEnabled: z.boolean().optional(),
       storageUploadMaxFileSize: z.number().min(0).optional(),
-      storageUploadMaxFileCount: z.number().min(0).optional(),
       storageSpaceQuotaByUser: z.number().min(0).optional(),
       storageOverflowAction: z.enum(StorageOverflowAction).optional()
     })
@@ -26,7 +25,6 @@ const updateSettingsRoute = protectedProcedure
       allowNewUsers: input.allowNewUsers,
       storageUploadEnabled: input.storageUploadEnabled,
       storageUploadMaxFileSize: input.storageUploadMaxFileSize,
-      storageUploadMaxFileCount: input.storageUploadMaxFileCount,
       storageSpaceQuotaByUser: input.storageSpaceQuotaByUser,
       storageOverflowAction: input.storageOverflowAction
     });

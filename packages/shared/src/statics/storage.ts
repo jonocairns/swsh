@@ -23,10 +23,12 @@ export type TStorageData = {
   usedStorage: number;
 };
 
+export const STORAGE_QUOTA = 100 * 1024 * 1024 * 1024; // 100GB
+export const STORAGE_MIN_QUOTA = 1 * 1024 * 1024 * 1024; // 1GB
+export const STORAGE_MAX_QUOTA = 1 * 1024 * 1024 * 1024 * 1024; // 1TB
+
 export const STORAGE_MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 export const STORAGE_MIN_FILE_SIZE = 1 * 1024 * 1024; // 1MB
-export const STORAGE_MAX_FILE_COUNT = 100;
-export const STORAGE_MIN_FILE_COUNT = 1;
 export const STORAGE_MAX_QUOTA_PER_USER = 100 * 1024 * 1024 * 1024; // 100GB
 export const STORAGE_MIN_QUOTA_PER_USER = 0; // unlimited
 export const STORAGE_OVERFLOW_ACTION = StorageOverflowAction.PREVENT_UPLOADS;

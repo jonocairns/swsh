@@ -153,8 +153,8 @@ CREATE TABLE `settings` (
 	`logoId` integer,
 	`allowNewUsers` integer DEFAULT true NOT NULL,
 	`storageUploadsEnabled` integer DEFAULT true NOT NULL,
+	`storageQuota` integer DEFAULT 107374182400 NOT NULL,
 	`storageUploadMaxFileSize` integer DEFAULT 2147483648 NOT NULL,
-	`storageUploadMaxFileCount` integer DEFAULT 100 NOT NULL,
 	`storageSpaceQuotaByUser` integer DEFAULT 0 NOT NULL,
 	`storageOverflowAction` text DEFAULT 'prevent' NOT NULL,
 	FOREIGN KEY (`logoId`) REFERENCES `files`(`id`) ON UPDATE no action ON DELETE no action

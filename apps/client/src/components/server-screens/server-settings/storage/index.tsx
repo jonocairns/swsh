@@ -20,11 +20,11 @@ import { Switch } from '@/components/ui/switch';
 import { closeServerScreens } from '@/features/server-screens/actions';
 import { useAdminStorage } from '@/features/server/admin/hooks';
 import {
-  STORAGE_MAX_FILE_COUNT,
   STORAGE_MAX_FILE_SIZE,
+  STORAGE_MAX_QUOTA,
   STORAGE_MAX_QUOTA_PER_USER,
-  STORAGE_MIN_FILE_COUNT,
   STORAGE_MIN_FILE_SIZE,
+  STORAGE_MIN_QUOTA,
   STORAGE_MIN_QUOTA_PER_USER,
   STORAGE_OVERFLOW_ACTIONS_DICT,
   StorageOverflowAction
@@ -69,6 +69,27 @@ const Storage = memo(() => {
         </Group>
 
         <Group
+          label="Quota"
+          description="The total amount of storage space allocated to the server."
+          help="This is not a hard limit, meaning that files will still be written to disk temporarily even if the quota is exceeded. The overflow action will be applied after the upload is complete. Make sure you have more disk space available than the quota you set here."
+        >
+          <Slider
+            className="w-96"
+            value={[Number(values.storageQuota)]}
+            max={STORAGE_MAX_QUOTA}
+            min={STORAGE_MIN_QUOTA}
+            step={FILE_SIZE_STEP}
+            disabled={!values.storageUploadEnabled}
+            onValueChange={(values) => onChange('storageQuota', values[0])}
+            rightSlot={
+              <span className="text-sm">
+                {labels.storageQuota.value} {labels.storageQuota.unit}
+              </span>
+            }
+          />
+        </Group>
+
+        <Group
           label="Max file size"
           description="The maximum size of a single file that can be uploaded to the server."
         >
@@ -86,29 +107,6 @@ const Storage = memo(() => {
               <span className="text-sm">
                 {labels.storageUploadMaxFileSize.value}{' '}
                 {labels.storageUploadMaxFileSize.unit}
-              </span>
-            }
-          />
-        </Group>
-
-        <Group
-          label="Max file count"
-          description="The maximum number of files that can be uploaded in a single request."
-        >
-          <Slider
-            className="w-96"
-            value={[values.storageUploadMaxFileCount]}
-            max={STORAGE_MAX_FILE_COUNT}
-            min={STORAGE_MIN_FILE_COUNT}
-            step={1}
-            disabled={!values.storageUploadEnabled}
-            onValueChange={(values) =>
-              onChange('storageUploadMaxFileCount', values[0])
-            }
-            rightSlot={
-              <span className="text-sm">
-                {values.storageUploadMaxFileCount}{' '}
-                {values.storageUploadMaxFileCount === 1 ? 'file' : 'files'}
               </span>
             }
           />
