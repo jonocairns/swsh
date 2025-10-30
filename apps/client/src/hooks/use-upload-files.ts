@@ -4,6 +4,8 @@ import { Permission, type TTempFile } from '@sharkord/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+// TODO: check if it works in all browsers
+
 const useUploadFiles = () => {
   const [files, setFiles] = useState<TTempFile[]>([]);
   const filesRef = useRef<TTempFile[]>([]);

@@ -3,13 +3,13 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
   Calendar,
+  ClipboardList,
   Clock,
   Gavel,
   Globe,
   IdCard,
   Network,
-  ShieldCheck,
-  User
+  ShieldCheck
 } from 'lucide-react';
 import { memo } from 'react';
 import { useModViewContext } from '../context';
@@ -51,8 +51,8 @@ const UserInformation = memo(() => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <User className="h-5 w-5" />
-          User Information
+          <ClipboardList className="h-5 w-5" />
+          Details
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -78,7 +78,7 @@ const UserInformation = memo(() => {
           <Row
             icon={<Globe className="h-4 w-4 text-muted-foreground" />}
             label="Location"
-            value={`${lastLogin?.country || 'Unknown country'} - ${lastLogin?.city || 'Unknown city'}`}
+            value={`${lastLogin?.country || 'N/A'} - ${lastLogin?.city || 'N/A'}`}
           />
 
           <Row

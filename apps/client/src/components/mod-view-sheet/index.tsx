@@ -1,16 +1,9 @@
-import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetFooter,
-  SheetTitle
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { setModViewOpen } from '@/features/app/actions';
 import { useModViewOpen } from '@/features/app/hooks';
 import { useAdminUserInfo } from '@/features/server/admin/hooks';
-import { memo, useCallback, useEffect, useMemo } from 'react';
-import { ModViewContext, type TModViewContext } from './context';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { ModViewContext, ModViewScreen, type TModViewContext } from './context';
 import { ModViewContent } from './mod-view-content';
 
 type TContentWrapperProps = {
@@ -18,12 +11,51 @@ type TContentWrapperProps = {
 };
 
 const ContentWrapper = memo(({ userId }: TContentWrapperProps) => {
-  const { user, loading, refetch, logins } = useAdminUserInfo(userId);
-
-  const contextValue = useMemo<TModViewContext>(
-    () => ({ userId, user: user!, logins, refetch }),
-    [userId, user, logins, refetch]
+  const [currentView, setCurrentView] = useState<ModViewScreen | undefined>(
+    undefined
   );
+  const { user, loading, refetch, logins, files, messages } =
+    useAdminUserInfo(userId);
+
+  const contextValue = useMemo<TModViewContext>(() => {
+    const links: string[] = messages
+      .map((msg) => {
+        const content = msg.content ?? '';
+        const urls: string[] = [];
+
+        const hrefRegex = /href="([^"]+)"/g;
+        let match;
+        while ((match = hrefRegex.exec(content)) !== null) {
+          const url = match[1];
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            urls.push(url);
+          }
+        }
+
+        const plainUrlRegex =
+          /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/g;
+        let plainMatch;
+        while ((plainMatch = plainUrlRegex.exec(content)) !== null) {
+          urls.push(plainMatch[0]);
+        }
+
+        return urls;
+      })
+      .flat()
+      .filter((value, index, self) => self.indexOf(value) === index);
+
+    return {
+      userId,
+      user: user!,
+      logins,
+      files,
+      messages,
+      links,
+      refetch,
+      view: currentView,
+      setView: setCurrentView
+    };
+  }, [userId, refetch, files, user, logins, messages, currentView]);
 
   if (loading || !user) {
     return (
@@ -32,6 +64,8 @@ const ContentWrapper = memo(({ userId }: TContentWrapperProps) => {
       </div>
     );
   }
+
+  console.log('Rendering ModViewContent for userId:', contextValue);
 
   return (
     <ModViewContext.Provider value={contextValue}>
@@ -65,13 +99,6 @@ const ModViewSheet = memo(() => {
       <SheetContent close={handleClose}>
         <SheetTitle className="sr-only">User Moderation Panel</SheetTitle>
         {userId && <ContentWrapper userId={userId} />}
-        <SheetFooter>
-          <SheetClose asChild>
-            <Button variant="outline" onClick={handleClose}>
-              Close
-            </Button>
-          </SheetClose>
-        </SheetFooter>
       </SheetContent>
     </Sheet>
   );

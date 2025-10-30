@@ -1,6 +1,7 @@
 import http from 'http';
 import z from 'zod';
 import { config } from '../config';
+import { getWsInfo } from '../helpers/get-ws-info';
 import { logger } from '../logger';
 import { healthRouteHandler } from './healthz';
 import { infoRouteHandler } from './info';
@@ -21,12 +22,9 @@ const createHttpServer = async () => {
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', '*');
 
-        logger.debug(
-          '%s - %s - (%s)',
-          req.method,
-          req.url,
-          req.socket.remoteAddress
-        );
+        const info = getWsInfo(undefined, req);
+
+        logger.debug('[HTTP] %s - %s - [%s]', req.method, req.url, info?.ip);
 
         if (req.method === 'OPTIONS') {
           res.writeHead(200);

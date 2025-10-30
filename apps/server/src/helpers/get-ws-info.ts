@@ -2,7 +2,10 @@ import type http from 'http';
 import { UAParser } from 'ua-parser-js';
 import type { TConnectionInfo } from '../types';
 
-const getWsIp = (ws: any, req: http.IncomingMessage): string | undefined => {
+const getWsIp = (
+  ws: any | undefined,
+  req: http.IncomingMessage
+): string | undefined => {
   const headers = req?.headers || {};
 
   let ip =
@@ -14,8 +17,8 @@ const getWsIp = (ws: any, req: http.IncomingMessage): string | undefined => {
     headers['x-cluster-client-ip'] ||
     headers['forwarded-for'] ||
     headers['forwarded'] ||
-    ws._socket?.remoteAddress ||
-    ws.socket?.remoteAddress ||
+    ws?._socket?.remoteAddress ||
+    ws?.socket?.remoteAddress ||
     req?.socket?.remoteAddress ||
     req?.connection?.remoteAddress;
 
@@ -45,7 +48,7 @@ const getWsIp = (ws: any, req: http.IncomingMessage): string | undefined => {
 };
 
 const getWsInfo = (
-  ws: any,
+  ws: any | undefined,
   req: http.IncomingMessage
 ): TConnectionInfo | undefined => {
   const ip = getWsIp(ws, req);

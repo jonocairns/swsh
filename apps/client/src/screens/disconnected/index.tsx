@@ -46,10 +46,8 @@ const Disconnected = memo(({ info }: TDisconnectedProps) => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="text-center space-y-6 max-w-md px-6">
-        {/* Icon */}
         <div className="flex justify-center">{disconnectType.icon}</div>
 
-        {/* Title & Message */}
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold text-foreground">
             {disconnectType.title}

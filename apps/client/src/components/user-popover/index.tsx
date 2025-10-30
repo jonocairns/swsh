@@ -9,7 +9,6 @@ import { memo } from 'react';
 import { Protect } from '../protect';
 import { Button } from '../ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Tooltip } from '../ui/tooltip';
 import { UserAvatar } from '../user-avatar';
 import { UserStatusBadge } from '../user-status';
 
@@ -50,19 +49,6 @@ const UserPopover = memo(({ userId, children }: TUserPopoverProps) => {
               }}
             />
           )}
-          <Protect permission={Permission.MANAGE_USERS}>
-            <div className="absolute left-4 top-4">
-              <Tooltip content="Moderate User">
-                <Button
-                  variant="default"
-                  size="iconSm"
-                  onClick={() => setModViewOpen(true, user.id)}
-                >
-                  <UserCog className="h-4 w-4" />
-                </Button>
-              </Tooltip>
-            </div>
-          </Protect>
           <div className="absolute left-4 top-16">
             <UserAvatar
               userId={user.id}
@@ -105,10 +91,22 @@ const UserPopover = memo(({ userId, children }: TUserPopoverProps) => {
               </p>
             </div>
           )}
-          <div className="mt-4 pt-3 border-t border-border">
+          <div className="flex justify-between items-center mt-4 pt-3 border-t border-border">
             <p className="text-xs text-muted-foreground">
               Member since {format(new Date(user.createdAt), 'PP')}
             </p>
+
+            <Protect permission={Permission.MANAGE_USERS}>
+              <div className="">
+                <Button
+                  variant="ghost"
+                  size="iconSm"
+                  onClick={() => setModViewOpen(true, user.id)}
+                >
+                  <UserCog className="h-4 w-4" />
+                </Button>
+              </div>
+            </Protect>
           </div>
         </div>
       </PopoverContent>

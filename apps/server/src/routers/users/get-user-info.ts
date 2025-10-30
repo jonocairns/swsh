@@ -1,7 +1,9 @@
 import { Permission } from '@sharkord/shared';
 import { TRPCError } from '@trpc/server';
 import z from 'zod';
+import { getFilesByUserId } from '../../db/queries/files/get-files-by-user-id';
 import { getLastLogins } from '../../db/queries/logins/get-last-logins';
+import { getMessagesByUserId } from '../../db/queries/messages/get-messages-by-user-id';
 import { getUserById } from '../../db/queries/users/get-user-by-id';
 import { protectedProcedure } from '../../utils/trpc';
 
@@ -22,9 +24,13 @@ const getUserInfoRoute = protectedProcedure
       });
     }
 
-    const [logins] = await Promise.all([getLastLogins(user.id, 6)]);
+    const [logins, files, messages] = await Promise.all([
+      getLastLogins(user.id, 6),
+      getFilesByUserId(user.id),
+      getMessagesByUserId(user.id)
+    ]);
 
-    return { user, logins };
+    return { user, logins, files, messages };
   });
 
 export { getUserInfoRoute };

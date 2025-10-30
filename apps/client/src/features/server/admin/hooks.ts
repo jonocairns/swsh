@@ -14,6 +14,7 @@ import {
   type TJoinedRole,
   type TJoinedUser,
   type TLogin,
+  type TMessage,
   type TRole,
   type TStorageSettings
 } from '@sharkord/shared';
@@ -329,16 +330,22 @@ export const useAdminUserInfo = (userId: number) => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<TJoinedUser | null>(null);
   const [logins, setLogins] = useState<TLogin[]>([]);
+  const [files, setFiles] = useState<TFile[]>([]);
+  const [messages, setMessages] = useState<TMessage[]>([]);
 
   const fetchUser = useCallback(async () => {
     setLoading(true);
 
     const trpc = getTRPCClient();
-    const { user, logins } = await trpc.users.getInfo.query({ userId });
+    const { user, logins, files, messages } = await trpc.users.getInfo.query({
+      userId
+    });
 
     setUser(user);
     setLoading(false);
     setLogins(logins);
+    setFiles(files);
+    setMessages(messages);
   }, [userId]);
 
   useEffect(() => {
@@ -348,7 +355,9 @@ export const useAdminUserInfo = (userId: number) => {
   return {
     user,
     logins,
+    files,
     refetch: fetchUser,
-    loading
+    loading,
+    messages
   };
 };
