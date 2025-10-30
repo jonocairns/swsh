@@ -110,13 +110,6 @@ const UserPopover = memo(({ userId, children }: TUserPopoverProps) => {
               Member since {format(new Date(user.createdAt), 'PP')}
             </p>
           </div>
-
-          <Button
-            className="w-full mt-4"
-            onClick={() => setModViewOpen(true, user.id)}
-          >
-            View Profile
-          </Button>
         </div>
       </PopoverContent>
     </Popover>
