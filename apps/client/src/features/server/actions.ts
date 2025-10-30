@@ -8,6 +8,7 @@ import { store } from '../store';
 import { infoSelector } from './selectors';
 import { serverSliceActions } from './slice';
 import { initSubscriptions } from './subscriptions';
+import type { TDisconnectInfo } from './types';
 
 export const setConnected = (status: boolean) => {
   store.dispatch(serverSliceActions.setConnected(status));
@@ -15,6 +16,10 @@ export const setConnected = (status: boolean) => {
 
 export const resetServerState = () => {
   store.dispatch(serverSliceActions.resetState());
+};
+
+export const setDisconnectInfo = (info: TDisconnectInfo | undefined) => {
+  store.dispatch(serverSliceActions.setDisconnectInfo(info));
 };
 
 export const setConnecting = (status: boolean) => {
@@ -62,8 +67,6 @@ export const connect = async () => {
 export const joinServer = async (handshakeHash: string, password?: string) => {
   const trpc = getTRPCClient();
   const data = await trpc.others.joinServer.query({ handshakeHash, password });
-
-  console.log('Joined server', data);
 
   // TODO: store unsubscribe function and call it on disconnect
   initSubscriptions();

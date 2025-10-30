@@ -2,17 +2,16 @@ import Queue from 'queue';
 import { publishMessageUpdate } from '../../db/publishers';
 import { processMessageMetadata } from './get-message-metadata';
 
-const messagesMetadataProcessor = new Queue({
+const messageMetadataQueue = new Queue({
   concurrency: 1,
   autostart: true,
   timeout: 3000
 });
 
-messagesMetadataProcessor.autostart = true;
-messagesMetadataProcessor.start();
+messageMetadataQueue.autostart = true;
 
-export const enqueueProcessMetadata = (content: string, messageId: number) => {
-  messagesMetadataProcessor.push(async (callback) => {
+const enqueueProcessMetadata = (content: string, messageId: number) => {
+  messageMetadataQueue.push(async (callback) => {
     const updatedMessage = await processMessageMetadata(content, messageId);
 
     if (updatedMessage) {
@@ -22,3 +21,5 @@ export const enqueueProcessMetadata = (content: string, messageId: number) => {
     callback?.();
   });
 };
+
+export { enqueueProcessMetadata, messageMetadataQueue };

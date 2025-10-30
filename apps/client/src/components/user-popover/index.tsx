@@ -1,12 +1,17 @@
+import { setModViewOpen } from '@/features/app/actions';
 import { useUserRole } from '@/features/server/hooks';
 import { useUserById } from '@/features/server/users/hooks';
 import { getFileUrl } from '@/helpers/get-file-url';
-import { cn } from '@/lib/utils';
-import { UserStatus } from '@sharkord/shared';
+import { Permission, UserStatus } from '@sharkord/shared';
 import { format } from 'date-fns';
+import { ShieldCheck, UserCog } from 'lucide-react';
 import { memo } from 'react';
+import { Protect } from '../protect';
+import { Button } from '../ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Tooltip } from '../ui/tooltip';
 import { UserAvatar } from '../user-avatar';
+import { UserStatusBadge } from '../user-status';
 
 type TUserPopoverProps = {
   userId: number;
@@ -24,6 +29,12 @@ const UserPopover = memo(({ userId, children }: TUserPopoverProps) => {
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start" side="right">
         <div className="relative">
+          {user.banned && (
+            <div className="absolute right-2 top-2 bg-red-500 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1">
+              <ShieldCheck className="h-3 w-3" />
+              Banned
+            </div>
+          )}
           {user.banner ? (
             <div
               className="h-24 w-full rounded-t-md bg-cover bg-center bg-no-repeat"
@@ -39,6 +50,19 @@ const UserPopover = memo(({ userId, children }: TUserPopoverProps) => {
               }}
             />
           )}
+          <Protect permission={Permission.MANAGE_USERS}>
+            <div className="absolute left-4 top-4">
+              <Tooltip content="Moderate User">
+                <Button
+                  variant="default"
+                  size="iconSm"
+                  onClick={() => setModViewOpen(true, user.id)}
+                >
+                  <UserCog className="h-4 w-4" />
+                </Button>
+              </Tooltip>
+            </div>
+          </Protect>
           <div className="absolute left-4 top-16">
             <UserAvatar
               userId={user.id}
@@ -55,13 +79,9 @@ const UserPopover = memo(({ userId, children }: TUserPopoverProps) => {
             </span>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2">
-                <div
-                  className={cn(
-                    'h-2 w-2 rounded-full',
-                    user.status === UserStatus.ONLINE && 'bg-green-500',
-                    user.status === UserStatus.IDLE && 'bg-yellow-500',
-                    user.status === UserStatus.OFFLINE && 'bg-gray-500'
-                  )}
+                <UserStatusBadge
+                  status={user.status || UserStatus.OFFLINE}
+                  className="h-3 w-3"
                 />
                 <span className="text-xs text-muted-foreground capitalize">
                   {user.status || UserStatus.OFFLINE}
@@ -90,6 +110,13 @@ const UserPopover = memo(({ userId, children }: TUserPopoverProps) => {
               Member since {format(new Date(user.createdAt), 'PP')}
             </p>
           </div>
+
+          <Button
+            className="w-full mt-4"
+            onClick={() => setModViewOpen(true, user.id)}
+          >
+            View Profile
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

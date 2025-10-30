@@ -120,7 +120,13 @@ const users = sqliteTable(
       .notNull()
       .references(() => roles.id),
     bio: text('bio'),
+    banned: integer('banned', { mode: 'boolean' }).notNull().default(false),
+    banReason: text('banReason'),
+    bannedAt: integer('bannedAt'),
     bannerColor: text('bannerColor'),
+    lastLoginAt: integer('lastLoginAt')
+      .notNull()
+      .$defaultFn(() => Date.now()),
     createdAt: integer('createdAt').notNull(),
     updatedAt: integer('updatedAt')
   },
@@ -137,11 +143,18 @@ const logins = sqliteTable(
     userId: integer('userId')
       .notNull()
       .references(() => users.id),
-    userAgent: text('userAgent').notNull(),
+    userAgent: text('userAgent'),
     os: text('os'),
     device: text('device'),
     ip: text('ip'),
-    ipInfo: text('ipInfo'),
+    hostname: text('hostname'),
+    city: text('city'),
+    region: text('region'),
+    country: text('country'),
+    loc: text('loc'),
+    org: text('org'),
+    postal: text('postal'),
+    timezone: text('timezone'),
     createdAt: integer('createdAt').notNull(),
     updatedAt: integer('updatedAt')
   },

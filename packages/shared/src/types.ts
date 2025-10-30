@@ -81,3 +81,15 @@ export type TVersionInfo = {
   releaseDate: string;
   artifacts: TArtifact[];
 };
+
+export type TIpInfo = {
+  ip: string;
+  hostname: string;
+  city: string;
+  region: string;
+  country: string;
+  loc: string;
+  org: string;
+  postal: string;
+  timezone: string;
+};

@@ -45,3 +45,10 @@ export type TChannelPaginationMap = {
 export type TPreloadedNotificationSoundsMap = {
   [soundType in NotificationSoundType]?: HTMLAudioElement;
 };
+
+export type TDisconnectInfo = {
+  code: number;
+  reason: string;
+  wasClean: boolean;
+  time: Date;
+};

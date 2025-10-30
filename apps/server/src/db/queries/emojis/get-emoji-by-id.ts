@@ -19,6 +19,7 @@ const getEmojiById = async (id: number): Promise<TJoinedEmoji | undefined> => {
         bannerColor: users.bannerColor,
         bio: users.bio,
         createdAt: users.createdAt,
+        banned: users.banned,
         avatarId: users.avatarId,
         bannerId: users.bannerId
       },

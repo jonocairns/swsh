@@ -11,6 +11,9 @@ import {
 
 export const connectedSelector = (state: IRootState) => state.server.connected;
 
+export const disconnectInfoSelector = (state: IRootState) =>
+  state.server.disconnectInfo;
+
 export const connectingSelector = (state: IRootState) =>
   state.server.connecting;
 

@@ -12,6 +12,7 @@ import { WebSocketServer } from 'ws';
 import { getUserById } from '../db/queries/users/get-user-by-id';
 import { getUserByToken } from '../db/queries/users/get-user-by-token';
 import { getUserRole } from '../db/queries/users/get-user-role';
+import { getWsInfo } from '../helpers/get-ws-info';
 import { logger } from '../logger';
 import { appRouter } from '../routers';
 import { pubsub } from './pubsub';
@@ -63,13 +64,17 @@ const createWsServer = async (server: http.Server) => {
     applyWSSHandler({
       wss,
       router: appRouter,
-      createContext: async ({ info }) => {
+      createContext: async ({ info, req }) => {
         const { token } = info.connectionParams as TConnectionParams;
 
         const decodedUser = await getUserByToken(token);
 
         if (!decodedUser) {
           throw new TRPCError({ code: 'UNAUTHORIZED' });
+        }
+
+        if (decodedUser.banned) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'User is banned' });
         }
 
         const hasPermission = async (
@@ -92,9 +97,15 @@ const createWsServer = async (server: http.Server) => {
           return role.permissions.includes(targetPermission);
         };
 
-        const getWs = () => {
+        const getOwnWs = () => {
           return Array.from(wss.clients).find(
             (client) => client.token === token
+          );
+        };
+
+        const getUserWs = (userId: number) => {
+          return Array.from(wss.clients).find(
+            (client) => client.userId === userId
           );
         };
 
@@ -116,6 +127,16 @@ const createWsServer = async (server: http.Server) => {
           }
         };
 
+        const getConnectionInfo = () => {
+          const ws = Array.from(wss.clients).find(
+            (client) => client.token === token
+          ) as any;
+
+          if (!ws) return undefined;
+
+          return getWsInfo(ws, req);
+        };
+
         const needsPermission = async (
           targetPermission: Permission | Permission[]
         ) => {
@@ -131,11 +152,13 @@ const createWsServer = async (server: http.Server) => {
           authenticated: false,
           userId: decodedUser.id,
           handshakeHash: '',
-          hasPermission: hasPermission,
-          getWs,
+          hasPermission,
+          getOwnWs,
           getStatusById,
           setWsUserId,
-          needsPermission: needsPermission
+          needsPermission,
+          getUserWs,
+          getConnectionInfo
         };
       }
     });

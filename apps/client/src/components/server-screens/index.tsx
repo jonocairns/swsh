@@ -1,3 +1,4 @@
+import { useModViewOpen } from '@/features/app/hooks';
 import { closeServerScreens } from '@/features/server-screens/actions';
 import { useServerScreenInfo } from '@/features/server-screens/hooks';
 import { createElement, memo, useCallback, useEffect, type JSX } from 'react';
@@ -20,11 +21,19 @@ type TComponentWrapperProps = {
 };
 
 const ComponentWrapper = ({ children }: TComponentWrapperProps) => {
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      closeServerScreens();
-    }
-  }, []);
+  const { isOpen } = useModViewOpen();
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      // when mod view is open, do not close server screens
+      if (isOpen) return;
+
+      if (e.key === 'Escape') {
+        closeServerScreens();
+      }
+    },
+    [isOpen]
+  );
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);

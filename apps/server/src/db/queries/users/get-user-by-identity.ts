@@ -23,6 +23,10 @@ const getUserByIdentity = async (
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
       password: users.password,
+      lastLoginAt: users.lastLoginAt,
+      banned: users.banned,
+      banReason: users.banReason,
+      bannedAt: users.bannedAt,
       avatar: avatarFiles,
       banner: bannerFiles
     })

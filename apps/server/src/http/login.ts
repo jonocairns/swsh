@@ -23,6 +23,13 @@ const loginRouteHandler = async (
     throw new HttpValidationError('identity', 'Identity not found');
   }
 
+  if (existingUser.banned) {
+    throw new HttpValidationError(
+      'identity',
+      `Identity banned: ${existingUser.banReason || 'No reason provided'}`
+    );
+  }
+
   const hashedPassword = await sha256(data.password);
   const passwordMatches = existingUser.password === hashedPassword;
 

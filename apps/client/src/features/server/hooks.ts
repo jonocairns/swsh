@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import {
   connectedSelector,
   connectingSelector,
+  disconnectInfoSelector,
   infoSelector,
   ownUserRoleSelector,
   publicServerSettingsSelector,
@@ -15,6 +16,8 @@ import {
 export const useIsConnected = () => useSelector(connectedSelector);
 
 export const useIsConnecting = () => useSelector(connectingSelector);
+
+export const useDisconnectInfo = () => useSelector(disconnectInfoSelector);
 
 export const useServerName = () => useSelector(serverNameSelector);
 

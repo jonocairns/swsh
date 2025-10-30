@@ -7,7 +7,7 @@ import {
 import { z } from 'zod';
 import { addFileMessageRelation } from '../../db/mutations/files/add-file-message-relation';
 import { createMessage } from '../../db/mutations/messages/create-message';
-import { enqueueProcessMetadata } from '../../queues/message-metadata-procesor';
+import { enqueueProcessMetadata } from '../../queues/message-metadata';
 import { fileManager } from '../../utils/file-manager';
 import { protectedProcedure } from '../../utils/trpc';
 

@@ -1,3 +1,7 @@
+import { resetApp } from '@/features/app/actions';
+import { resetDialogs } from '@/features/dialogs/actions';
+import { resetServerScreens } from '@/features/server-screens/actions';
+import { resetServerState, setDisconnectInfo } from '@/features/server/actions';
 import { SessionStorageKey } from '@/types';
 import type { AppRouter, TConnectionParams } from '@sharkord/shared';
 import { createTRPCProxyClient, createWSClient, wsLink } from '@trpc/client';
@@ -9,11 +13,18 @@ let currentHost: string | null = null;
 const initializeTRPC = (host: string) => {
   wsClient = createWSClient({
     url: `ws://${host}`,
-    onClose: (cause) => {
+    // @ts-expect-error - the onclose type is not correct in trpc
+    onClose: (cause: CloseEvent) => {
       console.log('WebSocket connection closed. Cause:', cause);
+      console.log(cause);
 
-      trpc = null;
-      wsClient = null;
+      cleanup();
+      setDisconnectInfo({
+        code: cause.code,
+        reason: cause.reason,
+        wasClean: cause.wasClean,
+        time: new Date()
+      });
     },
     connectionParams: async (): Promise<TConnectionParams> => {
       return {
@@ -54,6 +65,11 @@ const cleanup = () => {
   }
   trpc = null;
   currentHost = null;
+
+  resetServerScreens();
+  resetServerState();
+  resetDialogs();
+  resetApp();
 };
 
 export { cleanup, connectToTRPC, getTRPCClient, type AppRouter };

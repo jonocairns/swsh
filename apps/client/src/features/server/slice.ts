@@ -10,11 +10,12 @@ import type {
   TServerInfo,
   TUser
 } from '@sharkord/shared';
-import type { TMessagesMap } from './types';
+import type { TDisconnectInfo, TMessagesMap } from './types';
 
 export interface IServerState {
   connected: boolean;
   connecting: boolean;
+  disconnectInfo?: TDisconnectInfo;
   serverId?: string;
   categories: TCategory[];
   channels: TChannel[];
@@ -35,6 +36,7 @@ export interface IServerState {
 const initialState: IServerState = {
   connected: false,
   connecting: false,
+  disconnectInfo: undefined,
   serverId: undefined,
   categories: [],
   channels: [],
@@ -54,7 +56,12 @@ export const serverSlice = createSlice({
   name: 'server',
   initialState,
   reducers: {
-    resetState: () => initialState,
+    resetState: (state) => {
+      Object.assign(state, {
+        ...initialState,
+        info: state.info
+      });
+    },
     setConnected: (state, action: PayloadAction<boolean>) => {
       state.connected = action.payload;
       state.connecting = false;
@@ -84,6 +91,12 @@ export const serverSlice = createSlice({
         ...state.ownUser,
         ...action.payload
       };
+    },
+    setDisconnectInfo: (
+      state,
+      action: PayloadAction<TDisconnectInfo | undefined>
+    ) => {
+      state.disconnectInfo = action.payload;
     },
     setInitialData: (
       state,

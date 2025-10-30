@@ -30,8 +30,6 @@ export const handleUserJoin = (user: TJoinedPublicUser) => {
   const state = store.getState();
   const foundUser = userByIdSelector(state, user.id);
 
-  console.log('handleUserJoin', { user, foundUser });
-
   if (foundUser) {
     updateUser(user.id, { ...user, status: UserStatus.ONLINE });
   } else {

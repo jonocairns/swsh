@@ -1,6 +1,7 @@
 import { UserStatus, type Permission, type TUser } from '@sharkord/shared';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type WebSocket from 'ws';
+import type { TConnectionInfo } from '../types';
 import { pubsub } from './pubsub';
 
 export type Context = {
@@ -16,9 +17,11 @@ export type Context = {
   needsPermission: (
     targetPermission: Permission | Permission[]
   ) => Promise<void>;
-  getWs: () => WebSocket | undefined;
+  getOwnWs: () => WebSocket | undefined;
   getStatusById: (userId: number) => UserStatus;
   setWsUserId: (userId: number) => void;
+  getUserWs: (userId: number) => WebSocket | undefined;
+  getConnectionInfo: () => TConnectionInfo | undefined;
 };
 
 const t = initTRPC.context<Context>().create();

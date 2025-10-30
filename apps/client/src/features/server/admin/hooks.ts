@@ -12,6 +12,8 @@ import {
   type TFile,
   type TJoinedEmoji,
   type TJoinedRole,
+  type TJoinedUser,
+  type TLogin,
   type TRole,
   type TStorageSettings
 } from '@sharkord/shared';
@@ -295,5 +297,58 @@ export const useAdminStorage = () => {
     r,
     onChange,
     diskMetrics
+  };
+};
+
+export const useAdminUsers = () => {
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<TJoinedUser[]>([]);
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+
+    const trpc = getTRPCClient();
+    const users = await trpc.users.getAll.query();
+
+    setUsers(users);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  return {
+    users,
+    refetch: fetchUsers,
+    loading
+  };
+};
+
+export const useAdminUserInfo = (userId: number) => {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<TJoinedUser | null>(null);
+  const [logins, setLogins] = useState<TLogin[]>([]);
+
+  const fetchUser = useCallback(async () => {
+    setLoading(true);
+
+    const trpc = getTRPCClient();
+    const { user, logins } = await trpc.users.getInfo.query({ userId });
+
+    setUser(user);
+    setLoading(false);
+    setLogins(logins);
+  }, [userId]);
+
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
+
+  return {
+    user,
+    logins,
+    refetch: fetchUser,
+    loading
   };
 };

@@ -5,12 +5,14 @@ import {
 } from '@sharkord/shared';
 import { z } from 'zod';
 import { db } from '../../db';
+import { updateUser } from '../../db/mutations/users/update-user';
 import { getEmojis } from '../../db/queries/emojis/get-emojis';
 import { getSettings } from '../../db/queries/others/get-settings';
 import { getRoles } from '../../db/queries/roles/get-roles';
 import { getPublicUsers } from '../../db/queries/users/get-public-users';
 import { categories, channels } from '../../db/schema';
 import { logger } from '../../logger';
+import { enqueueLogin } from '../../queues/logins';
 import { t } from '../../utils/trpc';
 
 const joinServerRoute = t.procedure
@@ -75,6 +77,9 @@ const joinServerRoute = t.procedure
       ...foundPublicUser!,
       status: UserStatus.ONLINE
     });
+
+    updateUser(ctx.user.id, { lastLoginAt: Date.now() });
+    enqueueLogin(ctx.user.id, ctx.getConnectionInfo());
 
     return {
       categories: allCategories,

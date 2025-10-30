@@ -67,6 +67,7 @@ type TPublicUser = Pick<
   | "avatarId"
   | "banner"
   | "bannerId"
+  | "banned"
   | "createdAt"
 > & {
   status?: UserStatus;

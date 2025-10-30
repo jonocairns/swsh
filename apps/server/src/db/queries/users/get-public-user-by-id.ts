@@ -17,6 +17,7 @@ const getPublicUserById = async (
       roleId: users.roleId,
       bannerColor: users.bannerColor,
       bio: users.bio,
+      banned: users.banned,
       avatarId: users.avatarId,
       bannerId: users.bannerId,
       avatar: avatarFiles,
@@ -41,7 +42,8 @@ const getPublicUserById = async (
     bannerId: results.bannerId,
     avatar: results.avatar,
     banner: results.banner,
-    createdAt: results.createdAt
+    createdAt: results.createdAt,
+    banned: results.banned
   };
 };
 

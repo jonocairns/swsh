@@ -23,6 +23,10 @@ const getUserById = async (
       bannerColor: users.bannerColor,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+      lastLoginAt: users.lastLoginAt,
+      banned: users.banned,
+      banReason: users.banReason,
+      bannedAt: users.bannedAt,
       avatar: avatarFiles,
       banner: bannerFiles
     })
