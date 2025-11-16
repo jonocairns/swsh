@@ -36,7 +36,7 @@ const deleteMessageRoute = protectedProcedure
 
     await removeMessage(input.messageId);
 
-    publishMessage(input.messageId, 'delete');
+    publishMessage(input.messageId, targetMessage.channelId, 'delete');
   });
 
 export { deleteMessageRoute };

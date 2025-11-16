@@ -1,7 +1,7 @@
 const logVoice = (...args: unknown[]) => {
   console.log(
     '%c[VOICE-PROVIDER]',
-    'color: purple; font-weight: bold;',
+    'color: salmon; font-weight: bold;',
     ...args
   );
 };

@@ -13,7 +13,7 @@ const deleteFileRoute = protectedProcedure
 
     if (!message) return;
 
-    await publishMessage(message.id, 'update');
+    await publishMessage(message.id, undefined, 'update');
   });
 
 export { deleteFileRoute };

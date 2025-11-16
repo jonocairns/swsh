@@ -42,7 +42,7 @@ const editMessageRoute = protectedProcedure
       });
     }
 
-    publishMessage(updatedMessage.id, 'update');
+    publishMessage(updatedMessage.id, undefined, 'update');
     enqueueProcessMetadata(input.content, updatedMessage.id);
   });
 

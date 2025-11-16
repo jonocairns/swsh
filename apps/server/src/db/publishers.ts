@@ -9,22 +9,23 @@ import { getPublicUserById } from './queries/users/get-public-user-by-id';
 
 const publishMessage = async (
   messageId: number | undefined,
+  channelId: number | undefined,
   type: 'update' | 'delete'
 ) => {
-  if (!messageId) return;
-
-  const message = await getMessage(messageId);
-
-  if (!message) return;
+  if (!messageId || !channelId) return;
 
   if (type === 'delete') {
     pubsub.publish(ServerEvents.MESSAGE_DELETE, {
-      messageId: message.id,
-      channelId: message.channelId
+      messageId: messageId,
+      channelId: channelId
     });
 
     return;
   }
+
+  const message = await getMessage(messageId);
+
+  if (!message) return;
 
   pubsub.publish(ServerEvents.MESSAGE_UPDATE, message);
 };

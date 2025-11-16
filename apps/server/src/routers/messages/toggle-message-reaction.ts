@@ -31,7 +31,7 @@ const toggleMessageReactionRoute = protectedProcedure
       await removeReaction(input.messageId, input.emoji, ctx.user.id);
     }
 
-    publishMessage(input.messageId, 'update');
+    publishMessage(input.messageId, undefined, 'update');
   });
 
 export { toggleMessageReactionRoute };
