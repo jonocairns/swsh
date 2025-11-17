@@ -27,14 +27,8 @@ const VoiceUserCard = memo(
     showPinControls = true,
     voiceUser
   }: TVoiceUserCardProps) => {
-    const {
-      videoRef,
-      audioRef,
-      hasAudioStream,
-      hasVideoStream,
-      isSpeaking,
-      speakingIntensity
-    } = useVoiceRefs(userId);
+    const { videoRef, hasVideoStream, isSpeaking, speakingIntensity } =
+      useVoiceRefs(userId);
 
     const handlePinToggle = useCallback(() => {
       if (isPinned) {
@@ -77,7 +71,6 @@ const VoiceUserCard = memo(
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
-        {hasAudioStream && <audio ref={audioRef} className="hidden" autoPlay />}
         {!hasVideoStream && (
           <UserAvatar
             userId={userId}

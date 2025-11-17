@@ -13,7 +13,6 @@ const VoiceChannel = memo(({ channelId }: TChannelProps) => {
   const voiceUsers = useVoiceUsersByChannelId(channelId);
   const { pinnedCard, pinCard, unpinCard, isPinned } = usePinnedCard();
 
-  // Create cards for each user and their screen shares
   const cards = useMemo(() => {
     const userCards: React.ReactNode[] = [];
 
