@@ -75,7 +75,6 @@ const seedDatabase = async () => {
       position: 0,
       categoryId: 1,
       topic: 'General text channel',
-      password: null,
       createdAt: firstStart
     },
     {
@@ -84,7 +83,6 @@ const seedDatabase = async () => {
       position: 1,
       categoryId: 1,
       topic: 'General text channel 2',
-      password: null,
       createdAt: firstStart
     },
     {
@@ -93,7 +91,6 @@ const seedDatabase = async () => {
       position: 0,
       categoryId: 2,
       topic: 'General voice channel',
-      password: null,
       createdAt: firstStart
     },
     {
@@ -102,7 +99,6 @@ const seedDatabase = async () => {
       position: 1,
       categoryId: 2,
       topic: 'General voice channel 2',
-      password: null,
       createdAt: firstStart
     }
   ];
