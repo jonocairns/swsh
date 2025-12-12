@@ -4,6 +4,8 @@ const audioCtx = new (window.AudioContext ||
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).webkitAudioContext)();
 
+const SOUNDS_VOLUME = 2;
+
 const now = () => audioCtx.currentTime;
 
 const createOsc = (type: OscillatorType, freq: number) => {
@@ -18,7 +20,7 @@ const createOsc = (type: OscillatorType, freq: number) => {
 const createGain = (value = 1) => {
   const gain = audioCtx.createGain();
 
-  gain.gain.setValueAtTime(value, now());
+  gain.gain.setValueAtTime(value * SOUNDS_VOLUME, now());
 
   return gain;
 };

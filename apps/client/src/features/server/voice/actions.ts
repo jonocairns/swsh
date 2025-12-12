@@ -1,3 +1,4 @@
+import type { TPinnedCard } from '@/components/channel-view/voice/hooks/use-pin-card-controller';
 import { store } from '@/features/store';
 import { getTrpcError } from '@/helpers/parse-trpc-errors';
 import { getTRPCClient } from '@/lib/trpc';
@@ -122,6 +123,7 @@ export const leaveVoice = async (): Promise<void> => {
   }
 
   setCurrentVoiceChannelId(undefined);
+  setPinnedCard(undefined);
 
   const client = getTRPCClient();
 
@@ -131,4 +133,8 @@ export const leaveVoice = async (): Promise<void> => {
   } catch (error) {
     toast.error(getTrpcError(error, 'Failed to leave voice channel'));
   }
+};
+
+export const setPinnedCard = (pinnedCard: TPinnedCard | undefined): void => {
+  store.dispatch(serverSliceActions.setPinnedCard(pinnedCard));
 };

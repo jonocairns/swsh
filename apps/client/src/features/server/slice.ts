@@ -1,3 +1,4 @@
+import type { TPinnedCard } from '@/components/channel-view/voice/hooks/use-pin-card-controller';
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type {
   TCategory,
@@ -36,6 +37,7 @@ export interface IServerState {
   };
   voiceMap: TVoiceMap;
   ownVoiceState: TVoiceUserState;
+  pinnedCard: TPinnedCard | undefined;
 }
 
 const initialState: IServerState = {
@@ -62,7 +64,8 @@ const initialState: IServerState = {
     soundMuted: false,
     webcamEnabled: false,
     sharingScreen: false
-  }
+  },
+  pinnedCard: undefined
 };
 
 export const serverSlice = createSlice({
@@ -426,6 +429,9 @@ export const serverSlice = createSlice({
         ...state.ownVoiceState,
         ...action.payload
       };
+    },
+    setPinnedCard: (state, action: PayloadAction<TPinnedCard | undefined>) => {
+      state.pinnedCard = action.payload;
     }
   }
 });

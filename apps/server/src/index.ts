@@ -1,4 +1,5 @@
 // these two imports NEED to be at the very top in this order
+// keep the "---------" because it forces prettier to not mess with the order, I can't turn this off here for some reason, need to check later
 import { ensureServerDirs } from './helpers/ensure-server-dirs';
 await ensureServerDirs();
 // ----------------------------------------

@@ -1,4 +1,6 @@
-import { useCallback, useState } from 'react';
+import { setPinnedCard } from '@/features/server/voice/actions';
+import { usePinnedCard } from '@/features/server/voice/hooks';
+import { useCallback } from 'react';
 
 enum PinnedCardType {
   USER = 'user',
@@ -11,15 +13,15 @@ type TPinnedCard = {
   userId: number;
 };
 
-const usePinnedCard = () => {
-  const [pinnedCard, setPinnedCard] = useState<TPinnedCard | null>(null);
+const usePinCardController = () => {
+  const pinnedCard = usePinnedCard();
 
   const pinCard = useCallback((card: TPinnedCard) => {
     setPinnedCard(card);
   }, []);
 
   const unpinCard = useCallback(() => {
-    setPinnedCard(null);
+    setPinnedCard(undefined);
   }, []);
 
   const isPinned = useCallback(
@@ -37,5 +39,5 @@ const usePinnedCard = () => {
   };
 };
 
-export { PinnedCardType, usePinnedCard };
+export { PinnedCardType, usePinCardController };
 export type { TPinnedCard };

@@ -2,7 +2,11 @@ import { VoiceProviderContext } from '@/components/voice-provider';
 import type { IRootState } from '@/features/store';
 import { useContext } from 'react';
 import { useSelector } from 'react-redux';
-import { ownVoiceStateSelector, voiceChannelStateSelector } from './selectors';
+import {
+  ownVoiceStateSelector,
+  pinnedCardSelector,
+  voiceChannelStateSelector
+} from './selectors';
 
 export const useVoiceChannelState = (channelId: number) =>
   useSelector((state: IRootState) =>
@@ -22,3 +26,5 @@ export const useVoice = () => {
 };
 
 export const useOwnVoiceState = () => useSelector(ownVoiceStateSelector);
+
+export const usePinnedCard = () => useSelector(pinnedCardSelector);

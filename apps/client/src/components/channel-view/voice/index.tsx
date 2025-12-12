@@ -1,6 +1,9 @@
 import { useVoiceUsersByChannelId } from '@/features/server/hooks';
 import { memo, useMemo } from 'react';
-import { PinnedCardType, usePinnedCard } from './hooks/use-pinned-card';
+import {
+  PinnedCardType,
+  usePinCardController
+} from './hooks/use-pin-card-controller';
 import { ScreenShareCard } from './screen-share-card';
 import { VoiceGrid } from './voice-grid';
 import { VoiceUserCard } from './voice-user-card';
@@ -11,7 +14,7 @@ type TChannelProps = {
 
 const VoiceChannel = memo(({ channelId }: TChannelProps) => {
   const voiceUsers = useVoiceUsersByChannelId(channelId);
-  const { pinnedCard, pinCard, unpinCard, isPinned } = usePinnedCard();
+  const { pinnedCard, pinCard, unpinCard, isPinned } = usePinCardController();
 
   const cards = useMemo(() => {
     const userCards: React.ReactNode[] = [];

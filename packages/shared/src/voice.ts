@@ -30,6 +30,3 @@ export type TVoiceMap = {
     };
   };
 };
-
-// export type not available in the client, so we export it here
-export type { RtpCapabilities } from "mediasoup/types";
