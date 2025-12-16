@@ -2,7 +2,7 @@ import { Permission } from '@sharkord/shared';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db';
-import { removeFile } from '../../db/mutationsv2/files';
+import { removeFile } from '../../db/mutations/files';
 import { publishMessage } from '../../db/publishers';
 import { getFilesByMessageId } from '../../db/queries/files/get-files-by-message-id';
 import { getMessage } from '../../db/queries/messages/get-message';

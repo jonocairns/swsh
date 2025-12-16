@@ -1,6 +1,6 @@
 import { ActivityLogType, StorageOverflowAction } from '@sharkord/shared';
 import { z } from 'zod';
-import { updateSettings as updateSettingsMutation } from '../../db/mutationsv2/server';
+import { updateSettings as updateSettingsMutation } from '../../db/mutations/server';
 import { publishSettings } from '../../db/publishers';
 import { enqueueActivityLog } from '../../queues/activity-log';
 import { protectedProcedure } from '../../utils/trpc';

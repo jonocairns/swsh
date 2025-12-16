@@ -2,7 +2,7 @@ import { ActivityLogType, Permission } from '@sharkord/shared';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db';
-import { removeFile } from '../../db/mutationsv2/files';
+import { removeFile } from '../../db/mutations/files';
 import { publishEmoji } from '../../db/publishers';
 import { emojis } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';

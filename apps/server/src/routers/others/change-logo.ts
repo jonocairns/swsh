@@ -1,6 +1,6 @@
 import z from 'zod';
-import { removeFile } from '../../db/mutationsv2/files';
-import { updateSettings } from '../../db/mutationsv2/server';
+import { removeFile } from '../../db/mutations/files';
+import { updateSettings } from '../../db/mutations/server';
 import { publishSettings } from '../../db/publishers';
 import { getSettings } from '../../db/queries/others/get-settings';
 import { fileManager } from '../../utils/file-manager';

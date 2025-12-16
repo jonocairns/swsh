@@ -9,7 +9,7 @@ import { parse } from 'file-type-mime';
 import fs from 'fs/promises';
 import path from 'path';
 import { db } from '../db';
-import { getUniqueFileId, removeFile } from '../db/mutationsv2/files';
+import { getUniqueFileId, removeFile } from '../db/mutations/files';
 import { getExceedingOldFiles } from '../db/queries/files/get-exeeding-old-files';
 import { getUsedFileQuota } from '../db/queries/files/get-used-file-quota';
 import { getSettings } from '../db/queries/others/get-settings';

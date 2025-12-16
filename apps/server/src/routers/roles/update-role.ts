@@ -2,7 +2,7 @@ import { ActivityLogType, OWNER_ROLE_ID, Permission } from '@sharkord/shared';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db';
-import { syncRolePermissions } from '../../db/mutationsv2/roles';
+import { syncRolePermissions } from '../../db/mutations/roles';
 import { publishRole } from '../../db/publishers';
 import { roles } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';

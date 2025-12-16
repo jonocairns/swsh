@@ -2,7 +2,7 @@ import { ActivityLogType, Permission } from '@sharkord/shared';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db';
-import { fallbackUsersToDefaultRole } from '../../db/mutationsv2/users';
+import { fallbackUsersToDefaultRole } from '../../db/mutations/users';
 import { publishRole } from '../../db/publishers';
 import { getRole } from '../../db/queries/roles/get-role';
 import { roles } from '../../db/schema';

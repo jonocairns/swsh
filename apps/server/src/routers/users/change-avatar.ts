@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import z from 'zod';
 import { db } from '../../db';
-import { removeFile } from '../../db/mutationsv2/files';
+import { removeFile } from '../../db/mutations/files';
 import { publishUser } from '../../db/publishers';
 import { getUserById } from '../../db/queries/users/get-user-by-id';
 import { users } from '../../db/schema';
