@@ -1,7 +1,9 @@
+import { eq } from 'drizzle-orm';
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
-import { getFile } from '../db/mutations/files/get-file';
+import { db } from '../db';
+import { files } from '../db/schema';
 import { PUBLIC_PATH } from '../helpers/paths';
 import { logger } from '../logger';
 
@@ -19,7 +21,11 @@ const publicRouteHandler = async (
   const extension = path.extname(lastSegment);
   const fileId = Number(lastSegment.replace(extension, ''));
 
-  const dbFile = await getFile(fileId);
+  const dbFile = await db
+    .select()
+    .from(files)
+    .where(eq(files.id, fileId))
+    .get();
 
   if (!dbFile) {
     res.writeHead(404, { 'Content-Type': 'application/json' });

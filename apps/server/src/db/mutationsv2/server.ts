@@ -1,7 +1,7 @@
 import type { TSettings } from '@sharkord/shared';
 import { isNotNull } from 'drizzle-orm';
-import { db } from '../..';
-import { settings } from '../../schema';
+import { db } from '..';
+import { settings } from '../schema';
 
 const updateSettings = async (serverSettings: Partial<TSettings>) =>
   db

@@ -1,8 +1,8 @@
 import { and, eq } from 'drizzle-orm';
-import { db } from '../..';
-import { invariant } from '../../../utils/invariant';
-import { getDefaultRole } from '../../queries/roles/get-default-role';
-import { userRoles } from '../../schema';
+import { db } from '..';
+import { invariant } from '../../utils/invariant';
+import { getDefaultRole } from '../queries/roles/get-default-role';
+import { userRoles } from '../schema';
 
 const fallbackUsersToDefaultRole = async (roleId: number) => {
   const defaultRole = await getDefaultRole();

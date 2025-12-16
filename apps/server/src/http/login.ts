@@ -1,16 +1,19 @@
 import { ActivityLogType, sha256, type TJoinedUser } from '@sharkord/shared';
+import { eq, sql } from 'drizzle-orm';
 import http from 'http';
 import jwt from 'jsonwebtoken';
 import z from 'zod';
-import { addInviteUse } from '../db/mutations/invites/add-invite-use';
-import { createUser } from '../db/mutations/users/create-user';
+import { db } from '../db';
 import { publishUser } from '../db/publishers';
 import { isInviteValid } from '../db/queries/invites/is-invite-valid';
 import { getServerToken } from '../db/queries/others/get-server-token';
 import { getSettings } from '../db/queries/others/get-settings';
 import { getUserByIdentity } from '../db/queries/users/get-user-by-identity';
+import { getDefaultRole } from '../db/queriesv2/roles';
+import { invites, userRoles, users } from '../db/schema';
 import { getWsInfo } from '../helpers/get-ws-info';
 import { enqueueActivityLog } from '../queues/activity-log';
+import { invariant } from '../utils/invariant';
 import { getJsonBody } from './helpers';
 import { HttpValidationError } from './utils';
 
@@ -27,9 +30,29 @@ const registerUser = async (
   ip?: string
 ): Promise<TJoinedUser> => {
   const hashedPassword = await sha256(password);
-  const createdUser = await createUser(identity, hashedPassword);
 
-  await publishUser(createdUser.id, 'create');
+  const defaultRole = await getDefaultRole();
+
+  invariant(defaultRole, 'Default role not found');
+
+  const user = await db
+    .insert(users)
+    .values({
+      name: 'SharkordUser',
+      identity,
+      createdAt: Date.now(),
+      password: hashedPassword
+    })
+    .returning()
+    .get();
+
+  await db.insert(userRoles).values({
+    roleId: defaultRole.id,
+    userId: user.id,
+    createdAt: Date.now()
+  });
+
+  await publishUser(user.id, 'create');
 
   const registeredUser = await getUserByIdentity(identity);
 
@@ -66,7 +89,13 @@ const loginRouteHandler = async (
         throw new HttpValidationError('identity', inviteError);
       }
 
-      await addInviteUse(data.invite!);
+      await db
+        .update(invites)
+        .set({
+          uses: sql`${invites.uses} + 1`
+        })
+        .where(eq(invites.code, data.invite!))
+        .execute();
     }
 
     // user doesn't exist, but registration is open OR invite was valid - create the user automatically

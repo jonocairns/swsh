@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { removeFile } from '../../db/mutations/files/remove-file';
+import { removeFile } from '../../db/mutationsv2/files';
 import { publishMessage } from '../../db/publishers';
 import { getMessageByFileId } from '../../db/queries/messages/get-message-by-file-id';
 import { protectedProcedure } from '../../utils/trpc';

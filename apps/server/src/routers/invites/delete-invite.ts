@@ -1,8 +1,10 @@
 import { ActivityLogType, Permission } from '@sharkord/shared';
-import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { removeInvite } from '../../db/mutations/invites/remove-invite';
+import { db } from '../../db';
+import { invites } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';
+import { invariant } from '../../utils/invariant';
 import { protectedProcedure } from '../../utils/trpc';
 
 const deleteInviteRoute = protectedProcedure
@@ -14,11 +16,13 @@ const deleteInviteRoute = protectedProcedure
   .mutation(async ({ input, ctx }) => {
     await ctx.needsPermission(Permission.MANAGE_INVITES);
 
-    const removedInvite = await removeInvite(input.inviteId);
+    const removedInvite = await db
+      .delete(invites)
+      .where(eq(invites.id, input.inviteId))
+      .returning()
+      .get();
 
-    if (!removedInvite) {
-      throw new TRPCError({ code: 'NOT_FOUND' });
-    }
+    invariant(removedInvite, 'Invite not found');
 
     enqueueActivityLog({
       type: ActivityLogType.DELETED_INVITE,

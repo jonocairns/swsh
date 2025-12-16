@@ -1,5 +1,6 @@
 import Queue from 'queue';
-import { createLogin } from '../../db/mutations/logins/create-login';
+import { db } from '../../db';
+import { logins } from '../../db/schema';
 import { logger } from '../../logger';
 import type { TConnectionInfo } from '../../types';
 import { getIpInfo } from '../../utils/logins';
@@ -22,12 +23,17 @@ const enqueueLogin = (userId: number, info: TConnectionInfo | undefined) => {
     const { ip, ...rest } = info;
     const ipInfo = ip ? await getIpInfo(ip) : undefined;
 
-    await createLogin({
-      userId,
-      ip,
-      ...rest,
-      ...ipInfo
-    });
+    await db
+      .insert(logins)
+      .values({
+        userId,
+        ip,
+        ...rest,
+        ...ipInfo,
+        createdAt: Date.now()
+      })
+      .returning()
+      .get();
 
     callback?.();
   });

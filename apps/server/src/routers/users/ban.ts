@@ -1,8 +1,10 @@
 import { ActivityLogType, DisconnectCode, Permission } from '@sharkord/shared';
 import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import z from 'zod';
-import { updateUser } from '../../db/mutations/users/update-user';
+import { db } from '../../db';
 import { publishUser } from '../../db/publishers';
+import { users } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';
 import { protectedProcedure } from '../../utils/trpc';
 
@@ -29,11 +31,14 @@ const banRoute = protectedProcedure
       userWs.close(DisconnectCode.BANNED, input.reason);
     }
 
-    await updateUser(input.userId, {
-      banned: true,
-      banReason: input.reason ?? null,
-      bannedAt: Date.now()
-    });
+    await db
+      .update(users)
+      .set({
+        banned: true,
+        banReason: input.reason ?? null,
+        bannedAt: Date.now()
+      })
+      .where(eq(users.id, input.userId));
 
     publishUser(input.userId, 'update');
 

@@ -1,11 +1,13 @@
 import { Permission } from '@sharkord/shared';
-import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { removeFile } from '../../db/mutations/files/remove-file';
-import { removeMessage } from '../../db/mutations/messages/remove-message';
+import { db } from '../../db';
+import { removeFile } from '../../db/mutationsv2/files';
 import { publishMessage } from '../../db/publishers';
 import { getFilesByMessageId } from '../../db/queries/files/get-files-by-message-id';
 import { getMessage } from '../../db/queries/messages/get-message';
+import { messages } from '../../db/schema';
+import { invariant } from '../../utils/invariant';
 import { protectedProcedure } from '../../utils/trpc';
 
 const deleteMessageRoute = protectedProcedure
@@ -13,16 +15,12 @@ const deleteMessageRoute = protectedProcedure
   .mutation(async ({ input, ctx }) => {
     const targetMessage = await getMessage(input.messageId);
 
-    if (!targetMessage) {
-      throw new TRPCError({ code: 'NOT_FOUND' });
-    }
-
-    if (
-      targetMessage.userId !== ctx.user.id &&
-      !(await ctx.hasPermission(Permission.MANAGE_MESSAGES))
-    ) {
-      throw new TRPCError({ code: 'FORBIDDEN' });
-    }
+    invariant(targetMessage, 'Message not found');
+    invariant(
+      targetMessage.userId === ctx.user.id ||
+        (await ctx.hasPermission(Permission.MANAGE_MESSAGES)),
+      'You do not have permission to delete this message'
+    );
 
     const files = await getFilesByMessageId(input.messageId);
 
@@ -34,7 +32,7 @@ const deleteMessageRoute = protectedProcedure
       await Promise.all(promises);
     }
 
-    await removeMessage(input.messageId);
+    await db.delete(messages).where(eq(messages.id, input.messageId));
 
     publishMessage(input.messageId, targetMessage.channelId, 'delete');
   });

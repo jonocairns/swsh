@@ -1,9 +1,11 @@
 import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import z from 'zod';
-import { removeFile } from '../../db/mutations/files/remove-file';
-import { updateUser } from '../../db/mutations/users/update-user';
+import { db } from '../../db';
+import { removeFile } from '../../db/mutationsv2/files';
 import { publishUser } from '../../db/publishers';
 import { getUserById } from '../../db/queries/users/get-user-by-id';
+import { users } from '../../db/schema';
 import { fileManager } from '../../utils/file-manager';
 import { protectedProcedure } from '../../utils/trpc';
 
@@ -22,13 +24,20 @@ const changeBannerRoute = protectedProcedure
 
     if (user.bannerId) {
       await removeFile(user.bannerId);
-      await updateUser(ctx.userId, { bannerId: null });
+
+      await db
+        .update(users)
+        .set({ bannerId: null })
+        .where(eq(users.id, ctx.userId));
     }
 
     if (input.fileId) {
       const newFile = await fileManager.saveFile(input.fileId, ctx.userId);
 
-      await updateUser(ctx.userId, { bannerId: newFile.id });
+      await db
+        .update(users)
+        .set({ bannerId: newFile.id })
+        .where(eq(users.id, ctx.userId));
     }
 
     await publishUser(ctx.userId, 'update');

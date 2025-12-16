@@ -1,11 +1,13 @@
 import { ActivityLogType, Permission } from '@sharkord/shared';
-import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { removeRole } from '../../db/mutations/roles/remove-role';
-import { fallbackUsersToDefaultRole } from '../../db/mutations/users/fallback-users-to-default-role';
+import { db } from '../../db';
+import { fallbackUsersToDefaultRole } from '../../db/mutationsv2/users';
 import { publishRole } from '../../db/publishers';
 import { getRole } from '../../db/queries/roles/get-role';
+import { roles } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';
+import { invariant } from '../../utils/invariant';
 import { protectedProcedure } from '../../utils/trpc';
 
 const deleteRoleRoute = protectedProcedure
@@ -19,26 +21,12 @@ const deleteRoleRoute = protectedProcedure
 
     const role = await getRole(input.roleId);
 
-    if (!role) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Role not found' });
-    }
-
-    if (role.isPersistent) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Cannot delete a persistent role'
-      });
-    }
-
-    if (role.isDefault) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Cannot delete the default role'
-      });
-    }
+    invariant(role, 'Role not found');
+    invariant(!role.isPersistent, 'Cannot delete a persistent role');
+    invariant(!role.isDefault, 'Cannot delete the default role');
 
     await fallbackUsersToDefaultRole(role.id);
-    await removeRole(role.id);
+    await db.delete(roles).where(eq(roles.id, role.id));
 
     publishRole(role.id, 'delete');
     enqueueActivityLog({

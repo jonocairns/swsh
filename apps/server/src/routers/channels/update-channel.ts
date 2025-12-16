@@ -1,9 +1,11 @@
 import { ActivityLogType } from '@sharkord/shared';
-import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { updateChannel } from '../../db/mutations/channels/update-channel';
+import { db } from '../../db';
 import { publishChannel } from '../../db/publishers';
+import { channels } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';
+import { invariant } from '../../utils/invariant';
 import { protectedProcedure } from '../../utils/trpc';
 
 const updateChannelRoute = protectedProcedure
@@ -15,16 +17,17 @@ const updateChannelRoute = protectedProcedure
     })
   )
   .mutation(async ({ ctx, input }) => {
-    const updatedChannel = await updateChannel(input.channelId, {
-      name: input.name,
-      topic: input.topic
-    });
+    const updatedChannel = await db
+      .update(channels)
+      .set({
+        name: input.name,
+        topic: input.topic
+      })
+      .where(eq(channels.id, input.channelId))
+      .returning()
+      .get();
 
-    if (!updatedChannel) {
-      throw new TRPCError({
-        code: 'NOT_FOUND'
-      });
-    }
+    invariant(updatedChannel, 'Channel not found');
 
     publishChannel(updatedChannel.id, 'update');
     enqueueActivityLog({
