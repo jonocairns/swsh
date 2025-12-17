@@ -1,5 +1,5 @@
 import { randomUUIDv7 } from 'bun';
-import { getSettings } from '../../db/queries/others/get-settings';
+import { getSettings } from '../../db/queries/server';
 import { publicProcedure } from '../../utils/trpc';
 
 const handshakeRoute = publicProcedure.query(async ({ ctx }) => {

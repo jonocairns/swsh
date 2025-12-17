@@ -1,7 +1,9 @@
 import { ActivityLogType, Permission } from '@sharkord/shared';
+import { eq } from 'drizzle-orm';
 import z from 'zod';
-import { updateUser } from '../../db/mutations/users/update-user';
+import { db } from '../../db';
 import { publishUser } from '../../db/publishers';
+import { users } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';
 import { protectedProcedure } from '../../utils/trpc';
 
@@ -14,10 +16,13 @@ const unbanRoute = protectedProcedure
   .mutation(async ({ ctx, input }) => {
     await ctx.needsPermission(Permission.MANAGE_USERS);
 
-    await updateUser(input.userId, {
-      banned: false,
-      banReason: null
-    });
+    await db
+      .update(users)
+      .set({
+        banned: false,
+        banReason: null
+      })
+      .where(eq(users.id, ctx.userId));
 
     publishUser(input.userId, 'update');
 

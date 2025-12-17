@@ -1,6 +1,8 @@
 import type { TGenericObject, TMessageMetadata } from '@sharkord/shared';
+import { eq } from 'drizzle-orm';
 import { getLinkPreview } from 'link-preview-js';
-import { updateMessage } from '../../db/mutations/messages/update-message';
+import { db } from '../../db';
+import { messages } from '../../db/schema';
 
 const metadataCache = new Map<string, TGenericObject>();
 
@@ -48,7 +50,13 @@ export const processMessageMetadata = async (
 ) => {
   const metadata = await urlMetadataParser(content);
 
-  return updateMessage(messageId, {
-    metadata
-  });
+  return db
+    .update(messages)
+    .set({
+      metadata,
+      updatedAt: Date.now()
+    })
+    .where(eq(messages.id, messageId))
+    .returning()
+    .get();
 };

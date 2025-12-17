@@ -1,7 +1,7 @@
 import type { Permission, TRole } from '@sharkord/shared';
 import { eq } from 'drizzle-orm';
-import { db } from '../..';
-import { rolePermissions, roles } from '../../schema';
+import { db } from '..';
+import { rolePermissions, roles } from '../schema';
 
 const syncRolePermissions = async (
   roleId: number,

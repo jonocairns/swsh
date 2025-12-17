@@ -1,9 +1,10 @@
 import { ActivityLogType, getRandomString, Permission } from '@sharkord/shared';
-import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { createInvite } from '../../db/mutations/invites/create-invite';
-import { getInviteByCode } from '../../db/queries/invites/get-invite-by-code';
+import { db } from '../../db';
+import { invites } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';
+import { invariant } from '../../utils/invariant';
 import { protectedProcedure } from '../../utils/trpc';
 
 const addInviteRoute = protectedProcedure
@@ -18,30 +19,26 @@ const addInviteRoute = protectedProcedure
     await ctx.needsPermission(Permission.MANAGE_INVITES);
 
     const newCode = input.code || getRandomString(24);
+    const existingInvite = await db
+      .select()
+      .from(invites)
+      .where(eq(invites.code, newCode))
+      .get();
 
-    const existingInvite = await getInviteByCode(newCode);
+    invariant(!existingInvite, 'Invite code should be unique');
 
-    if (existingInvite) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: 'Invite code should be unique'
-      });
-    }
-
-    const invite = await createInvite({
-      code: newCode,
-      creatorId: ctx.userId,
-      maxUses: input.maxUses || null,
-      uses: 0,
-      expiresAt: input.expiresAt || null
-    });
-
-    if (!invite) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Could not create invite'
-      });
-    }
+    const invite = await db
+      .insert(invites)
+      .values({
+        code: newCode,
+        creatorId: ctx.user.id,
+        maxUses: input.maxUses || null,
+        uses: 0,
+        expiresAt: input.expiresAt || null,
+        createdAt: Date.now()
+      })
+      .returning()
+      .get();
 
     enqueueActivityLog({
       type: ActivityLogType.CREATED_INVITE,

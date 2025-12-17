@@ -1,6 +1,6 @@
 import type { TDiskMetrics } from '@sharkord/shared';
 import si from 'systeminformation';
-import { getUsedFileQuota } from '../db/queries/files/get-used-file-quota';
+import { getUsedFileQuota } from '../db/queries/files';
 
 const getDiskMetrics = async (): Promise<TDiskMetrics> => {
   const [diskInfo, filesUsedSpace] = await Promise.all([

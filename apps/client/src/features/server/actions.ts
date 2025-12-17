@@ -68,6 +68,8 @@ export const joinServer = async (handshakeHash: string, password?: string) => {
   const trpc = getTRPCClient();
   const data = await trpc.others.joinServer.query({ handshakeHash, password });
 
+  console.log('Joined server with data:', data);
+
   // TODO: store unsubscribe function and call it on disconnect
   initSubscriptions();
 

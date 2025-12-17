@@ -5,8 +5,8 @@ import {
   type TJoinedMessage
 } from '@sharkord/shared';
 import { z } from 'zod';
-import { addFileMessageRelation } from '../../db/mutations/files/add-file-message-relation';
-import { createMessage } from '../../db/mutations/messages/create-message';
+import { db } from '../../db';
+import { messageFiles, messages } from '../../db/schema';
 import { enqueueProcessMetadata } from '../../queues/message-metadata';
 import { fileManager } from '../../utils/file-manager';
 import { protectedProcedure } from '../../utils/trpc';
@@ -24,11 +24,16 @@ const sendMessageRoute = protectedProcedure
   .mutation(async ({ input, ctx }) => {
     await ctx.needsPermission(Permission.SEND_MESSAGES);
 
-    const message = await createMessage({
-      channelId: input.channelId,
-      userId: ctx.userId,
-      content: input.content
-    });
+    const message = await db
+      .insert(messages)
+      .values({
+        channelId: input.channelId,
+        userId: ctx.userId,
+        content: input.content,
+        createdAt: Date.now()
+      })
+      .returning()
+      .get();
 
     const files: TFile[] = [];
 
@@ -36,7 +41,11 @@ const sendMessageRoute = protectedProcedure
       for (const tempFileId of input.files) {
         const newFile = await fileManager.saveFile(tempFileId, ctx.userId);
 
-        await addFileMessageRelation(message.id, newFile.id);
+        await db.insert(messageFiles).values({
+          messageId: message.id,
+          fileId: newFile.id,
+          createdAt: Date.now()
+        });
 
         files.push(newFile);
       }

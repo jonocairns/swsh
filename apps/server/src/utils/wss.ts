@@ -13,8 +13,6 @@ import {
 } from '@trpc/server/adapters/ws';
 import http from 'http';
 import { WebSocketServer } from 'ws';
-import { getUserById } from '../db/queries/users/get-user-by-id';
-import { getUserByToken } from '../db/queries/users/get-user-by-token';
 import { getWsInfo } from '../helpers/get-ws-info';
 import { logger } from '../logger';
 import { enqueueActivityLog } from '../queues/activity-log';
@@ -22,6 +20,7 @@ import { appRouter } from '../routers';
 import { VoiceRuntime } from '../runtimes/voice';
 // // this needs to be here because of tsc weirdness, check this in the future (when check-types on client it spits server errors)
 // import '../types/websocket';
+import { getUserById, getUserByToken } from '../db/queries/users';
 import { getUserRoles } from '../routers/users/get-user-roles';
 import { pubsub } from './pubsub';
 import type { Context } from './trpc';

@@ -1,11 +1,26 @@
 import type {
   TFile,
   TJoinedMessage,
-  TJoinedMessageReaction
+  TJoinedMessageReaction,
+  TMessage,
+  TMessageReaction
 } from '@sharkord/shared';
-import { eq } from 'drizzle-orm';
-import { db } from '../..';
-import { files, messageFiles, messageReactions, messages } from '../../schema';
+import { and, desc, eq } from 'drizzle-orm';
+import { db } from '..';
+import { files, messageFiles, messageReactions, messages } from '../schema';
+
+const getMessageByFileId = async (
+  fileId: number
+): Promise<TMessage | undefined> => {
+  const row = await db
+    .select({ message: messages })
+    .from(messageFiles)
+    .innerJoin(messages, eq(messages.id, messageFiles.messageId))
+    .where(eq(messageFiles.fileId, fileId))
+    .get();
+
+  return row?.message;
+};
 
 const getMessage = async (
   messageId: number
@@ -58,4 +73,28 @@ const getMessage = async (
   };
 };
 
-export { getMessage };
+const getMessagesByUserId = async (userId: number): Promise<TMessage[]> =>
+  db
+    .select()
+    .from(messages)
+    .where(eq(messages.userId, userId))
+    .orderBy(desc(messages.createdAt));
+
+const getReaction = async (
+  messageId: number,
+  emoji: string,
+  userId: number
+): Promise<TMessageReaction | undefined> =>
+  db
+    .select()
+    .from(messageReactions)
+    .where(
+      and(
+        eq(messageReactions.messageId, messageId),
+        eq(messageReactions.emoji, emoji),
+        eq(messageReactions.userId, userId)
+      )
+    )
+    .get();
+
+export { getMessage, getMessageByFileId, getMessagesByUserId, getReaction };

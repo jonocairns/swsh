@@ -8,13 +8,12 @@ import { createHash } from 'crypto';
 import { parse } from 'file-type-mime';
 import fs from 'fs/promises';
 import path from 'path';
-import { createFile } from '../db/mutations/files/create-file';
-import { getUniqueFileId } from '../db/mutations/files/get-unique-file-id';
-import { removeFile } from '../db/mutations/files/remove-file';
-import { getExceedingOldFiles } from '../db/queries/files/get-exeeding-old-files';
-import { getUsedFileQuota } from '../db/queries/files/get-used-file-quota';
-import { getSettings } from '../db/queries/others/get-settings';
-import { getStorageUsageByUserId } from '../db/queries/users/get-storage-usage-by-user-id';
+import { db } from '../db';
+import { getUniqueFileId, removeFile } from '../db/mutations/files';
+import { getExceedingOldFiles, getUsedFileQuota } from '../db/queries/files';
+import { getSettings } from '../db/queries/server';
+import { getStorageUsageByUserId } from '../db/queries/users';
+import { files } from '../db/schema';
 import { PUBLIC_PATH, TMP_PATH, UPLOADS_PATH } from '../helpers/paths';
 
 const TEMP_FILE_TTL = 1000 * 60 * 1; // 1 minute
@@ -124,9 +123,9 @@ class FileManager {
 
   private handleStorageLimits = async (tempFile: TTempFile) => {
     const [settings, userStorage, serverStorage] = await Promise.all([
-      await getSettings(),
-      await getStorageUsageByUserId(tempFile.userId),
-      await getUsedFileQuota()
+      getSettings(),
+      getStorageUsageByUserId(tempFile.userId),
+      getUsedFileQuota()
     ]);
 
     const newTotalStorage = userStorage.usedStorage + tempFile.size;
@@ -184,16 +183,20 @@ class FileManager {
     const arrayBuffer = await fs.readFile(destinationPath);
     const mimeResult = parse(new Uint8Array(arrayBuffer).buffer);
 
-    return createFile({
-      name: fileName,
-      extension: tempFile.extension,
-      md5: tempFile.md5,
-      size: tempFile.size,
-      originalName: tempFile.originalName,
-      userId,
-      mimeType: mimeResult?.mime || 'application/octet-stream',
-      createdAt: Date.now()
-    });
+    return db
+      .insert(files)
+      .values({
+        name: fileName,
+        extension: tempFile.extension,
+        md5: tempFile.md5,
+        size: tempFile.size,
+        originalName: tempFile.originalName,
+        userId,
+        mimeType: mimeResult?.mime || 'application/octet-stream',
+        createdAt: Date.now()
+      })
+      .returning()
+      .get();
   }
 }
 

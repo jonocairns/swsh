@@ -1,7 +1,8 @@
-import { asc, sum } from 'drizzle-orm';
-import { db } from '../..';
-import { files } from '../../schema';
-import { getSettings } from '../others/get-settings';
+import type { TFile } from '@sharkord/shared';
+import { asc, eq, sum } from 'drizzle-orm';
+import { db } from '..';
+import { files, messageFiles } from '../schema';
+import { getSettings } from './server';
 
 const getExceedingOldFiles = async (newFileSize: number) => {
   const { storageUploadMaxFileSize } = await getSettings();
@@ -34,8 +35,7 @@ const getExceedingOldFiles = async (newFileSize: number) => {
       createdAt: files.createdAt
     })
     .from(files)
-    .orderBy(asc(files.createdAt))
-    .all();
+    .orderBy(asc(files.createdAt));
 
   const filesToDelete = [];
   let freedSpace = 0;
@@ -52,4 +52,32 @@ const getExceedingOldFiles = async (newFileSize: number) => {
   return filesToDelete;
 };
 
-export { getExceedingOldFiles };
+const getFilesByMessageId = async (messageId: number): Promise<TFile[]> =>
+  db
+    .select()
+    .from(messageFiles)
+    .innerJoin(files, eq(messageFiles.fileId, files.id))
+    .where(eq(messageFiles.messageId, messageId))
+    .all()
+    .map((row) => row.files);
+
+const getFilesByUserId = async (userId: number): Promise<TFile[]> =>
+  db.select().from(files).where(eq(files.userId, userId));
+
+const getUsedFileQuota = async (): Promise<number> => {
+  const result = await db
+    .select({
+      usedSpace: sum(files.size)
+    })
+    .from(files)
+    .get();
+
+  return Number(result?.usedSpace ?? 0);
+};
+
+export {
+  getExceedingOldFiles,
+  getFilesByMessageId,
+  getFilesByUserId,
+  getUsedFileQuota
+};

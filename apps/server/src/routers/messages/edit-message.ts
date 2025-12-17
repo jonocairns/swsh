@@ -1,10 +1,11 @@
 import { Permission } from '@sharkord/shared';
-import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { updateMessage } from '../../db/mutations/messages/update-message';
+import { db } from '../../db';
 import { publishMessage } from '../../db/publishers';
-import { getRawMessage } from '../../db/queries/messages/get-raw-message';
+import { messages } from '../../db/schema';
 import { enqueueProcessMetadata } from '../../queues/message-metadata';
+import { invariant } from '../../utils/invariant';
 import { protectedProcedure } from '../../utils/trpc';
 
 const editMessageRoute = protectedProcedure
@@ -15,35 +16,32 @@ const editMessageRoute = protectedProcedure
     })
   )
   .mutation(async ({ input, ctx }) => {
-    const message = await getRawMessage(input.messageId);
+    const message = await db
+      .select({
+        userId: messages.userId
+      })
+      .from(messages)
+      .where(eq(messages.id, input.messageId))
+      .limit(1)
+      .get();
 
-    if (!message) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Message not found' });
-    }
+    invariant(message, 'Message not found');
+    invariant(
+      message.userId === ctx.user.id ||
+        (await ctx.hasPermission(Permission.MANAGE_MESSAGES)),
+      'You do not have permission to edit this message'
+    );
 
-    if (
-      message.userId !== ctx.user.id &&
-      !(await ctx.hasPermission(Permission.MANAGE_MESSAGES))
-    ) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Insufficient permissions'
-      });
-    }
+    await db
+      .update(messages)
+      .set({
+        content: input.content,
+        updatedAt: Date.now()
+      })
+      .where(eq(messages.id, input.messageId));
 
-    const updatedMessage = await updateMessage(input.messageId, {
-      content: input.content
-    });
-
-    if (!updatedMessage) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to update message'
-      });
-    }
-
-    publishMessage(updatedMessage.id, undefined, 'update');
-    enqueueProcessMetadata(input.content, updatedMessage.id);
+    publishMessage(input.messageId, undefined, 'update');
+    enqueueProcessMetadata(input.content, input.messageId);
   });
 
 export { editMessageRoute };

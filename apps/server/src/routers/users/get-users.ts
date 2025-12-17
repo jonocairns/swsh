@@ -1,5 +1,5 @@
 import { Permission } from '@sharkord/shared';
-import { getUsers } from '../../db/queries/users/get-users';
+import { getUsers } from '../../db/queries/users';
 import { clearFields } from '../../helpers/clear-fields';
 import { protectedProcedure } from '../../utils/trpc';
 

@@ -1,9 +1,9 @@
 import { ActivityLogType, Permission } from '@sharkord/shared';
-import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { createEmoji } from '../../db/mutations/emojis/create-emoji';
-import { getUniqueEmojiName } from '../../db/mutations/emojis/get-unique-emoji-name';
+import { db } from '../../db';
 import { publishEmoji } from '../../db/publishers';
+import { getUniqueEmojiName } from '../../db/queries/emojis';
+import { emojis } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';
 import { fileManager } from '../../utils/file-manager';
 import { protectedProcedure } from '../../utils/trpc';
@@ -24,19 +24,16 @@ const addEmojiRoute = protectedProcedure
       const newFile = await fileManager.saveFile(data.fileId, ctx.userId);
       const uniqueEmojiName = await getUniqueEmojiName(data.name);
 
-      const emoji = await createEmoji({
-        name: uniqueEmojiName,
-        userId: ctx.userId,
-        fileId: newFile.id,
-        createdAt: Date.now()
-      });
-
-      if (!emoji) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Could not create emoji'
-        });
-      }
+      const emoji = db
+        .insert(emojis)
+        .values({
+          name: uniqueEmojiName,
+          fileId: newFile.id,
+          userId: ctx.userId,
+          createdAt: Date.now()
+        })
+        .returning()
+        .get();
 
       publishEmoji(emoji.id, 'create');
       enqueueActivityLog({

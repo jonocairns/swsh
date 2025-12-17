@@ -4,14 +4,14 @@ import {
   UserStatus,
   type TPublicServerSettings
 } from '@sharkord/shared';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db';
-import { updateUser } from '../../db/mutations/users/update-user';
-import { getEmojis } from '../../db/queries/emojis/get-emojis';
-import { getSettings } from '../../db/queries/others/get-settings';
-import { getRoles } from '../../db/queries/roles/get-roles';
-import { getPublicUsers } from '../../db/queries/users/get-public-users';
-import { categories, channels } from '../../db/schema';
+import { getEmojis } from '../../db/queries/emojis';
+import { getRoles } from '../../db/queries/roles';
+import { getSettings } from '../../db/queries/server';
+import { getPublicUsers } from '../../db/queries/users';
+import { categories, channels, users } from '../../db/schema';
 import { logger } from '../../logger';
 import { enqueueActivityLog } from '../../queues/activity-log';
 import { enqueueLogin } from '../../queues/logins';
@@ -89,7 +89,11 @@ const joinServerRoute = t.procedure
 
     const voiceMap = VoiceRuntime.getVoiceMap();
 
-    updateUser(ctx.user.id, { lastLoginAt: Date.now() });
+    await db
+      .update(users)
+      .set({ lastLoginAt: Date.now() })
+      .where(eq(users.id, ctx.user.id));
+
     enqueueLogin(ctx.user.id, connectionInfo);
     enqueueActivityLog({
       type: ActivityLogType.USER_JOINED,

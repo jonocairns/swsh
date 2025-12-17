@@ -1,11 +1,12 @@
 import { ActivityLogType, Permission } from '@sharkord/shared';
-import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { updateEmoji } from '../../db/mutations/emojis/update-emoji';
+import { db } from '../../db';
 import { publishEmoji } from '../../db/publishers';
-import { emojiExists } from '../../db/queries/emojis/emoji-exists';
-import { getEmojiById } from '../../db/queries/emojis/get-emoji-by-id';
+import { emojiExists, getEmojiById } from '../../db/queries/emojis';
+import { emojis } from '../../db/schema';
 import { enqueueActivityLog } from '../../queues/activity-log';
+import { invariant } from '../../utils/invariant';
 import { protectedProcedure } from '../../utils/trpc';
 
 const updateEmojiRoute = protectedProcedure
@@ -20,12 +21,7 @@ const updateEmojiRoute = protectedProcedure
 
     const existingEmoji = await getEmojiById(input.emojiId);
 
-    if (!existingEmoji) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Emoji not found.'
-      });
-    }
+    invariant(existingEmoji, 'Emoji not found.');
 
     const exists = await emojiExists(input.name);
 
@@ -36,15 +32,15 @@ const updateEmojiRoute = protectedProcedure
       );
     }
 
-    const updatedEmoji = await updateEmoji(input.emojiId, {
-      name: input.name
-    });
-
-    if (!updatedEmoji) {
-      throw new TRPCError({
-        code: 'NOT_FOUND'
-      });
-    }
+    const updatedEmoji = await db
+      .update(emojis)
+      .set({
+        name: input.name,
+        updatedAt: Date.now()
+      })
+      .where(eq(emojis.id, existingEmoji.id))
+      .returning()
+      .get();
 
     publishEmoji(updatedEmoji.id, 'update');
     enqueueActivityLog({
