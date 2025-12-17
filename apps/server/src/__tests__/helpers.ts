@@ -14,8 +14,10 @@ const getMockedToken = async (userId: number) => {
   return token;
 };
 
+// this will basically simulate a specific user connecting to the server
 const initTest = async (userId: number = 1) => {
   const mockedToken = await getMockedToken(userId);
+
   const caller = appRouter.createCaller(
     await createMockContext({
       customToken: mockedToken
