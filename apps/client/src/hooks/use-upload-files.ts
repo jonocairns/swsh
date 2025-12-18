@@ -7,8 +7,6 @@ import { toast } from 'sonner';
 // TODO: check if it works in all browsers
 
 const useUploadFiles = (disabled: boolean = false) => {
-  console.log('useUploadFiles disabled:', disabled);
-
   const [files, setFiles] = useState<TTempFile[]>([]);
   const filesRef = useRef<TTempFile[]>([]);
   const [uploading, setUploading] = useState(false);

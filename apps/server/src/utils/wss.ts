@@ -21,8 +21,11 @@ import { appRouter } from '../routers';
 import { VoiceRuntime } from '../runtimes/voice';
 // // this needs to be here because of tsc weirdness, check this in the future (when check-types on client it spits server errors)
 // import '../types/websocket';
+import { eq } from 'drizzle-orm';
+import { db } from '../db';
 import { getChannelUserPermissions } from '../db/queries/channels';
 import { getUserById, getUserByToken } from '../db/queries/users';
+import { channels } from '../db/schema';
 import { getUserRoles } from '../routers/users/get-user-roles';
 import { pubsub } from './pubsub';
 import type { Context } from './trpc';
@@ -81,6 +84,19 @@ const createContext = async ({
     channelId: number,
     targetPermission: ChannelPermission
   ) => {
+    const channel = await db
+      .select({
+        private: channels.private
+      })
+      .from(channels)
+      .where(eq(channels.id, channelId))
+      .limit(1)
+      .get();
+
+    if (!channel) return false;
+
+    if (!channel.private) return true;
+
     const user = await getUserById(decodedUser.id);
 
     if (!user) return false;

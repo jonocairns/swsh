@@ -2,7 +2,7 @@ import { ChannelPermission, Permission } from '@sharkord/shared';
 import { useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import type { IRootState } from '../store';
-import { useChannelPermissionsById } from './channels/hooks';
+import { useChannelById, useChannelPermissionsById } from './channels/hooks';
 import {
   connectedSelector,
   connectingSelector,
@@ -66,14 +66,15 @@ export const useCan = () => {
 export const useChannelCan = (channelId: number) => {
   const ownUserRoles = useChannelPermissionsById(channelId);
   const isOwner = useIsOwnUserOwner();
+  const channel = useChannelById(channelId);
 
   const can = useCallback(
     (permission: ChannelPermission) => {
-      if (isOwner) return true;
+      if (isOwner || !channel?.private) return true;
 
       return ownUserRoles[permission] === true;
     },
-    [ownUserRoles, isOwner]
+    [ownUserRoles, isOwner, channel]
   );
 
   return can;
