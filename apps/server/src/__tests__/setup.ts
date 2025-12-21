@@ -1,7 +1,8 @@
 import { Database } from 'bun:sqlite';
-import { afterEach, beforeEach, mock } from 'bun:test';
+import { afterEach, beforeAll, beforeEach, mock } from 'bun:test';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { drizzle, type BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import { createHttpServer } from '../http';
 import { DRIZZLE_PATH, setTestDb } from './mock-db';
 import { seedDatabase } from './seed';
 
@@ -17,26 +18,37 @@ import { seedDatabase } from './seed';
  * 5. Cleaned up after the test
  */
 
-const noop = () => {};
+const DISABLE_CONSOLE = true;
 
-global.console.log = noop;
-global.console.info = noop;
-global.console.warn = noop;
-global.console.debug = noop;
+if (DISABLE_CONSOLE) {
+  const noop = () => {};
 
-mock.module('../logger', () => ({
-  logger: {
-    info: noop,
-    warn: noop,
-    error: noop,
-    debug: noop,
-    trace: noop,
-    fatal: noop
-  }
-}));
+  global.console.log = noop;
+  global.console.info = noop;
+  global.console.warn = noop;
+  global.console.debug = noop;
+
+  mock.module('../logger', () => ({
+    logger: {
+      info: noop,
+      warn: noop,
+      error: noop,
+      debug: noop,
+      trace: noop,
+      fatal: noop
+    }
+  }));
+}
 
 let tdb: BunSQLiteDatabase;
 let sqlite: Database | null = null;
+let testsBaseUrl: string;
+
+beforeAll(async () => {
+  await createHttpServer(9999);
+
+  testsBaseUrl = 'http://localhost:9999';
+});
 
 beforeEach(async () => {
   if (sqlite) {
@@ -70,4 +82,4 @@ afterEach(() => {
   }
 });
 
-export { tdb };
+export { tdb, testsBaseUrl };

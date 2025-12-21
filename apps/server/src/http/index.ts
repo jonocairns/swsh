@@ -14,7 +14,7 @@ import { HttpValidationError } from './utils';
 
 // this http server implementation is temporary and will be moved to bun server later when things are more stable
 
-const createHttpServer = async () => {
+const createHttpServer = async (port: number = config.server.port) => {
   return new Promise<http.Server>((resolve) => {
     const server = http.createServer(
       async (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -97,7 +97,7 @@ const createHttpServer = async () => {
     );
 
     server.on('listening', () => {
-      logger.debug('HTTP server is listening on port %d', config.server.port);
+      logger.debug('HTTP server is listening on port %d', port);
       resolve(server);
     });
 
@@ -106,7 +106,7 @@ const createHttpServer = async () => {
       process.exit(0);
     });
 
-    server.listen(config.server.port);
+    server.listen(port);
   });
 };
 

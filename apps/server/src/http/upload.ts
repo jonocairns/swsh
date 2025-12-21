@@ -1,28 +1,33 @@
 import { UploadHeaders } from '@sharkord/shared';
 import fs from 'fs';
 import http from 'http';
+import z from 'zod';
 import { getSettings } from '../db/queries/server';
 import { getUserByToken } from '../db/queries/users';
 import { logger } from '../logger';
 import { fileManager } from '../utils/file-manager';
 
+const zHeaders = z.object({
+  [UploadHeaders.TOKEN]: z.string(),
+  [UploadHeaders.ORIGINAL_NAME]: z.string(),
+  [UploadHeaders.CONTENT_LENGTH]: z.string().transform((val) => Number(val))
+});
+
 const uploadFileRouteHandler = async (
   req: http.IncomingMessage,
   res: http.ServerResponse
 ) => {
-  const token = String(req.headers[UploadHeaders.TOKEN]);
-  const originalName = String(req.headers[UploadHeaders.ORIGINAL_NAME]);
-  const contentLength = Number(req.headers[UploadHeaders.CONTENT_LENGTH]);
-
-  if (!token || !originalName || isNaN(contentLength)) {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Missing or invalid upload headers' }));
-    return;
-  }
+  const parsedHeaders = zHeaders.parse(req.headers);
+  const [token, originalName, contentLength] = [
+    parsedHeaders[UploadHeaders.TOKEN],
+    parsedHeaders[UploadHeaders.ORIGINAL_NAME],
+    parsedHeaders[UploadHeaders.CONTENT_LENGTH]
+  ];
 
   const user = await getUserByToken(token);
 
   if (!user) {
+    req.resume();
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
@@ -31,20 +36,26 @@ const uploadFileRouteHandler = async (
   const settings = await getSettings();
 
   if (contentLength > settings.storageUploadMaxFileSize) {
-    res.writeHead(413, { 'Content-Type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        error: `File ${originalName} exceeds the maximum allowed size`
-      })
-    );
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(413, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          error: `File ${originalName} exceeds the maximum allowed size`
+        })
+      );
+    });
     return;
   }
 
   if (!settings.storageUploadEnabled) {
-    res.writeHead(403, { 'Content-Type': 'application/json' });
-    res.end(
-      JSON.stringify({ error: 'File uploads are disabled on this server' })
-    );
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({ error: 'File uploads are disabled on this server' })
+      );
+    });
     return;
   }
 
@@ -73,6 +84,7 @@ const uploadFileRouteHandler = async (
 
   fileStream.on('error', (err) => {
     logger.error('Error uploading file:', err);
+
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'File upload failed' }));
   });

@@ -17,8 +17,8 @@ import { getJsonBody } from './helpers';
 import { HttpValidationError } from './utils';
 
 const zBody = z.object({
-  identity: z.string(),
-  password: z.string(),
+  identity: z.string().min(1, 'Identity is required'),
+  password: z.string().min(1, 'Password is required'),
   invite: z.string().optional()
 });
 

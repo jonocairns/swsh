@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { appRouter } from '../routers';
 import { createMockContext } from './context';
 import { TEST_SECRET_TOKEN } from './seed';
+import { testsBaseUrl } from './setup';
 
 const getMockedToken = async (userId: number) => {
   const hashedToken = await sha256(TEST_SECRET_TOKEN);
@@ -38,4 +39,17 @@ const initTest = async (userId: number = 1) => {
   return { caller, mockedToken, initialData };
 };
 
-export { getCaller, getMockedToken, initTest };
+const login = async (identity: string, password: string, invite?: string) =>
+  fetch(`${testsBaseUrl}/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      identity,
+      password,
+      invite
+    })
+  });
+
+export { getCaller, getMockedToken, initTest, login };

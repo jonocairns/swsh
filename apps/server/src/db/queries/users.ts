@@ -283,13 +283,17 @@ const getUserByIdentity = async (
 };
 
 const getUserByToken = async (token: string | undefined) => {
-  if (!token) return undefined;
+  try {
+    if (!token) return undefined;
 
-  const decoded = jwt.verify(token, await getServerToken()) as TTokenPayload;
+    const decoded = jwt.verify(token, await getServerToken()) as TTokenPayload;
 
-  const user = await getUserById(decoded.userId);
+    const user = await getUserById(decoded.userId);
 
-  return user;
+    return user;
+  } catch {
+    return undefined;
+  }
 };
 
 const getUsers = async (): Promise<TJoinedUser[]> => {

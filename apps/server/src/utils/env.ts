@@ -15,6 +15,7 @@ const BUILD_DATE =
 const env = typeof SHARKORD_ENV !== 'undefined' ? SHARKORD_ENV : 'development';
 const IS_PRODUCTION = env === 'production';
 const IS_DEVELOPMENT = !IS_PRODUCTION;
+const IS_TEST = process.env.NODE_ENV === 'test';
 
 if (IS_PRODUCTION) {
   if (!SHARKORD_MEDIASOUP_BIN_NAME) {
@@ -26,6 +27,7 @@ export {
   BUILD_DATE,
   IS_DEVELOPMENT,
   IS_PRODUCTION,
+  IS_TEST,
   SERVER_VERSION,
   SHARKORD_MEDIASOUP_BIN_NAME
 };

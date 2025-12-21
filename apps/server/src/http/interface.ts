@@ -3,13 +3,13 @@ import http from 'http';
 import path from 'path';
 import { INTERFACE_PATH } from '../helpers/paths';
 import { logger } from '../logger';
-import { IS_DEVELOPMENT } from '../utils/env';
+import { IS_DEVELOPMENT, IS_TEST } from '../utils/env';
 
 const interfaceRouteHandler = (
   req: http.IncomingMessage,
   res: http.ServerResponse
 ) => {
-  if (IS_DEVELOPMENT) {
+  if (IS_DEVELOPMENT && !IS_TEST) {
     res.writeHead(302, { Location: 'http://localhost:5173' });
     res.end();
     return res;
@@ -34,6 +34,14 @@ const interfaceRouteHandler = (
   }
 
   if (!fs.existsSync(requestedPath)) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+    return res;
+  }
+
+  const stats = fs.statSync(requestedPath);
+
+  if (stats.isDirectory()) {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
     return res;
