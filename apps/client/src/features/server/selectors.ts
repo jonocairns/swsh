@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { OWNER_ROLE_ID } from '@sharkord/shared';
+import { createCachedSelector } from 're-reselect';
 import type { IRootState } from '../store';
 import { currentVoiceChannelIdSelector } from './channels/selectors';
 import { typingMapSelector } from './messages/selectors';
@@ -58,10 +59,10 @@ export const userRolesIdsSelector = createSelector(
   (user) => user?.roleIds || []
 );
 
-export const typingUsersByChannelIdSelector = createSelector(
+export const typingUsersByChannelIdSelector = createCachedSelector(
   [
     typingMapSelector,
-    (_, channelId: number) => channelId,
+    (_: IRootState, channelId: number) => channelId,
     ownUserIdSelector,
     usersSelector
   ],
@@ -73,7 +74,7 @@ export const typingUsersByChannelIdSelector = createSelector(
       .map((id) => users.find((u) => u.id === id)!)
       .filter((u) => !!u);
   }
-);
+)((_, channelId: number) => channelId);
 
 export const voiceUsersByChannelIdSelector = createSelector(
   [usersSelector, voiceChannelStateSelector],

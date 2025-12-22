@@ -1,32 +1,36 @@
 import type { IRootState } from '@/features/store';
 import { createSelector } from '@reduxjs/toolkit';
+import { createCachedSelector } from 're-reselect';
 
 export const channelsSelector = (state: IRootState) => state.server.channels;
 
-export const channelByIdSelector = createSelector(
-  [channelsSelector, (_, channelId: number) => channelId],
-  (channels, channelId) => channels.find((channel) => channel.id === channelId)
-);
+export const selectedChannelIdSelector = (state: IRootState) =>
+  state.server.selectedChannelId;
 
-export const channelsByCategoryIdSelector = createSelector(
-  [channelsSelector, (_, categoryId: number) => categoryId],
+export const currentVoiceChannelIdSelector = (state: IRootState) =>
+  state.server.currentVoiceChannelId;
+
+export const channelPermissionsSelector = (state: IRootState) =>
+  state.server.channelPermissions;
+
+export const channelByIdSelector = createCachedSelector(
+  [channelsSelector, (_: IRootState, channelId: number) => channelId],
+  (channels, channelId) => channels.find((channel) => channel.id === channelId)
+)((_, channelId: number) => channelId);
+
+export const channelsByCategoryIdSelector = createCachedSelector(
+  [channelsSelector, (_: IRootState, categoryId: number) => categoryId],
   (channels, categoryId) =>
     channels
       .filter((channel) => channel.categoryId === categoryId)
       .sort((a, b) => a.position - b.position)
-);
-
-export const selectedChannelIdSelector = (state: IRootState) =>
-  state.server.selectedChannelId;
+)((_, categoryId: number) => categoryId);
 
 export const selectedChannelSelector = createSelector(
   [channelsSelector, selectedChannelIdSelector],
   (channels, selectedChannelId) =>
     channels.find((channel) => channel.id === selectedChannelId)
 );
-
-export const currentVoiceChannelIdSelector = (state: IRootState) =>
-  state.server.currentVoiceChannelId;
 
 export const isCurrentVoiceChannelSelectedSelector = createSelector(
   [selectedChannelIdSelector, currentVoiceChannelIdSelector],
@@ -35,11 +39,8 @@ export const isCurrentVoiceChannelSelectedSelector = createSelector(
     selectedChannelId === currentVoiceChannelId
 );
 
-export const channelPermissionsSelector = (state: IRootState) =>
-  state.server.channelPermissions;
-
-export const channelPermissionsByIdSelector = createSelector(
-  [channelPermissionsSelector, (_, channelId: number) => channelId],
+export const channelPermissionsByIdSelector = createCachedSelector(
+  [channelPermissionsSelector, (_: IRootState, channelId: number) => channelId],
   (channelPermissions, channelId) =>
     channelPermissions[channelId]?.permissions || {}
-);
+)((_, channelId: number) => channelId);

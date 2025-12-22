@@ -1,12 +1,12 @@
 import type { IRootState } from '@/features/store';
-import { createSelector } from '@reduxjs/toolkit';
+import { createCachedSelector } from 're-reselect';
 
 export const messagesMapSelector = (state: IRootState) =>
   state.server.messagesMap;
 
 export const typingMapSelector = (state: IRootState) => state.server.typingMap;
 
-export const messagesByChannelIdSelector = createSelector(
-  [messagesMapSelector, (_, channelId: number) => channelId],
+export const messagesByChannelIdSelector = createCachedSelector(
+  [messagesMapSelector, (_: IRootState, channelId: number) => channelId],
   (messagesMap, channelId) => messagesMap[channelId] || []
-);
+)((_, channelId: number) => channelId);

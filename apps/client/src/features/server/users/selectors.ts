@@ -1,12 +1,15 @@
 import type { IRootState } from '@/features/store';
 import { createSelector } from '@reduxjs/toolkit';
 import { UserStatus } from '@sharkord/shared';
+import { createCachedSelector } from 're-reselect';
 
 const STATUS_ORDER: Record<string, number> = {
   online: 0,
   idle: 1,
   offline: 2
 };
+
+export const ownUserIdSelector = (state: IRootState) => state.server.ownUserId;
 
 export const usersSelector = createSelector(
   (state: IRootState) => state.server.users,
@@ -31,22 +34,20 @@ export const usersSelector = createSelector(
   }
 );
 
-export const ownUserIdSelector = (state: IRootState) => state.server.ownUserId;
-
 export const ownUserSelector = createSelector(
   [ownUserIdSelector, usersSelector],
   (ownUserId, users) => users.find((user) => user.id === ownUserId)
 );
 
-export const userByIdSelector = createSelector(
-  [usersSelector, (_, userId: number) => userId],
+export const userByIdSelector = createCachedSelector(
+  [usersSelector, (_: IRootState, userId: number) => userId],
   (users, userId) => users.find((user) => user.id === userId)
-);
+)((_, userId: number) => userId);
 
-export const isOwnUserSelector = createSelector(
-  [ownUserIdSelector, (_, userId: number) => userId],
+export const isOwnUserSelector = createCachedSelector(
+  [ownUserIdSelector, (_: IRootState, userId: number) => userId],
   (ownUserId, userId) => ownUserId === userId
-);
+)((_, userId: number) => userId);
 
 export const ownPublicUserSelector = createSelector(
   [ownUserIdSelector, usersSelector],
