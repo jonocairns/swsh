@@ -26,7 +26,7 @@ Sharkord is distributed as a standalone binary that bundles both server and clie
 > [!NOTE]
 > Sharkord is in alpha stage. Bugs, incomplete features and breaking changes are to be expected.
 
-### Linux x64
+#### Linux x64
 
 ```bash
 curl -L https://github.com/sharkord/sharkord/releases/latest/download/sharkord-linux-x64 -o sharkord
@@ -34,7 +34,7 @@ chmod +x sharkord
 ./sharkord
 ```
 
-### Docker
+#### Docker
 
 Sharkord can also be run using Docker. Here's how to run it:
 
@@ -50,7 +50,7 @@ docker run \
 
 ### Open the Client
 
-Once the server is running, open your web browser and navigate to `http://localhost:4991` to access the Sharkord client interface. If you're running the server on a different machine, replace `localhost` with the server's IP address or domain name.
+Once the server is running, open your web browser and navigate to [http://localhost:4991](http://localhost:4991) to access the Sharkord client interface. If you're running the server on a different machine, replace `localhost` with the server's IP address or domain name.
 
 > [!NOTE]
 > Upon first launch, Sharkord will create a secure token and print it to the console. This token allows ANYONE to gain owner access to your server, so make sure to store it securely and do not lose it!
@@ -77,15 +77,15 @@ Upon first run, Sharkord will generate a default configuration file located at `
 
 At the moment, Sharkord does not have built-in support for HTTPS. To secure your server with HTTPS, we recommend using a reverse proxy like Nginx or Caddy in front of Sharkord. This setup allows you to manage SSL/TLS certificates and handle secure connections.
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Built with amazing open-source technologies:
 
