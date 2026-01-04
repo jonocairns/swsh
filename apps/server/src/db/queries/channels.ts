@@ -340,7 +340,7 @@ const getAffectedUserIdsForChannel = async (
     return allUsers.map((user) => user.id);
   }
 
-  // If a specific permission is required, filter by it
+  // if a specific permission is required, filter by it
   const permission = options?.permission;
 
   const usersWithDirectPerms = await db

@@ -7,6 +7,12 @@ export const channelsSelector = (state: IRootState) => state.server.channels;
 export const selectedChannelIdSelector = (state: IRootState) =>
   state.server.selectedChannelId;
 
+export const selectedChannelTypeSelector = createSelector(
+  [channelsSelector, selectedChannelIdSelector],
+  (channels, selectedChannelId) =>
+    channels.find((channel) => channel.id === selectedChannelId)?.type
+);
+
 export const currentVoiceChannelIdSelector = (state: IRootState) =>
   state.server.currentVoiceChannelId;
 
