@@ -31,9 +31,10 @@ const addChannelRoute = protectedProcedure
       const newChannel = await tx
         .insert(channels)
         .values({
-          position: maxPositionChannel?.position
-            ? maxPositionChannel.position + 1
-            : 0,
+          position:
+            maxPositionChannel?.position !== undefined
+              ? maxPositionChannel.position + 1
+              : 0,
           name: input.name,
           type: input.type,
           categoryId: input.categoryId,

@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, mock } from 'bun:test';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { drizzle, type BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { createHttpServer } from '../http';
+import { loadMediasoup } from '../utils/mediasoup';
 import { DRIZZLE_PATH, setTestDb } from './mock-db';
 import { seedDatabase } from './seed';
 
@@ -46,6 +47,7 @@ let testsBaseUrl: string;
 
 beforeAll(async () => {
   await createHttpServer(9999);
+  await loadMediasoup();
 
   testsBaseUrl = 'http://localhost:9999';
 });

@@ -1,4 +1,4 @@
-import { ActivityLogType } from '@sharkord/shared';
+import { ActivityLogType, Permission } from '@sharkord/shared';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db';
@@ -17,6 +17,8 @@ const updateChannelRoute = protectedProcedure
     })
   )
   .mutation(async ({ ctx, input }) => {
+    await ctx.needsPermission(Permission.MANAGE_CHANNELS);
+
     const updatedChannel = await db
       .update(channels)
       .set({

@@ -75,8 +75,6 @@ const joinServerRoute = t.procedure
       getChannelsReadStatesForUser(ctx.user.id)
     ]);
 
-    console.log('Read states on join:', readStates);
-
     const processedPublicUsers = publicUsers.map((u) => ({
       ...u,
       status: ctx.getStatusById(u.id),
