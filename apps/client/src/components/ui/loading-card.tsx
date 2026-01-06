@@ -12,7 +12,7 @@ const LoadingCard = memo(({ className }: TLoadingCardProps) => {
     <Card>
       <CardContent
         className={cn(
-          'h-48 flex items-center justify-center flex-col',
+          'h-48 flex items-center justify-center flex-col gap-2',
           className
         )}
       >

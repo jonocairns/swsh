@@ -150,6 +150,7 @@ const Channel = memo(({ channelId, isSelected }: TChannelProps) => {
   const channel = useChannelById(channelId);
   const currentVoiceChannelId = useCurrentVoiceChannelId();
   const channelCan = useChannelCan(channelId);
+  const can = useCan();
   const { init } = useVoice();
 
   const {
@@ -224,7 +225,10 @@ const Channel = memo(({ channelId, isSelected }: TChannelProps) => {
               isSelected={isSelected}
               onClick={onClick}
               dragHandleProps={{ ...attributes, ...listeners }}
-              disabled={!channelCan(ChannelPermission.JOIN)}
+              disabled={
+                !channelCan(ChannelPermission.JOIN) ||
+                !can(Permission.JOIN_VOICE_CHANNELS)
+              }
             />
           )}
         </div>
