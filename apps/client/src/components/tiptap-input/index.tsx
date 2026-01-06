@@ -18,8 +18,6 @@ type TTiptapInputProps = {
   onTyping?: () => void;
 };
 
-// TODO: deal with types properly here later
-
 const TiptapInput = memo(
   ({
     value,
@@ -39,13 +37,11 @@ const TiptapInput = memo(
               class: 'hard-break'
             }
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        }) as any,
+        }),
         Emoji.configure({
           emojis: [...gitHubEmojis, ...customEmojis],
           enableEmoticons: true,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          suggestion: EmojiSuggestion as any,
+          suggestion: EmojiSuggestion,
           HTMLAttributes: {
             class: 'emoji-image'
           }

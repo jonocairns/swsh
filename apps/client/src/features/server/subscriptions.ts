@@ -37,14 +37,22 @@ const subscribeToServer = () => {
 };
 
 const initSubscriptions = () => {
-  subscribeToChannels();
-  subscribeToServer();
-  subscribeToEmojis();
-  subscribeToRoles();
-  subscribeToUsers();
-  subscribeToMessages();
-  subscribeToVoice();
-  subscribeToCategories();
+  const subscriptors = [
+    subscribeToChannels,
+    subscribeToServer,
+    subscribeToEmojis,
+    subscribeToRoles,
+    subscribeToUsers,
+    subscribeToMessages,
+    subscribeToVoice,
+    subscribeToCategories
+  ];
+
+  const unsubscribes = subscriptors.map((subscriptor) => subscriptor());
+
+  return () => {
+    unsubscribes.forEach((unsubscribe) => unsubscribe());
+  };
 };
 
 export { initSubscriptions };

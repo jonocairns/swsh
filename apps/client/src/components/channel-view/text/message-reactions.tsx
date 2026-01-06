@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useCan } from '@/features/server/hooks';
-import { useOwnUserId, useUsers } from '@/features/server/users/hooks';
+import { useOwnUserId, useUsernames } from '@/features/server/users/hooks';
 import { getFileUrl } from '@/helpers/get-file-url';
 import { getTrpcError } from '@/helpers/parse-trpc-errors';
 import { getTRPCClient } from '@/lib/trpc';
@@ -27,22 +27,6 @@ type TAggregatedReaction = {
   isUserReacted: boolean;
   createdAt: number;
   file: TFile | null;
-};
-
-// TODO: this is SHIT and will hurt performance a lot since it's gonna make a LOT of unecessary rerenders
-// improve later (maybe create a hard cached selector with custom cache keys)
-const useUsernames = () => {
-  const users = useUsers();
-
-  return useMemo(() => {
-    const map = new Map<number, string>();
-
-    users.forEach((user) => {
-      map.set(user.id, user.name);
-    });
-
-    return map;
-  }, [users]);
 };
 
 const MessageReactions = memo(
@@ -131,7 +115,7 @@ const MessageReactions = memo(
       <div className="mt-1 flex flex-wrap gap-1">
         {aggregatedReactions.map((reaction) => {
           const tooltipContent = reaction.userIds
-            .map((userId) => usernames.get(userId) || 'Unknown')
+            .map((userId) => usernames[userId] || 'Unknown')
             .join(', ');
 
           return (

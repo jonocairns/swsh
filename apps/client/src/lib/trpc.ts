@@ -78,6 +78,4 @@ const cleanup = () => {
   removeSessionStorageItem(SessionStorageKey.TOKEN);
 };
 
-const disconnect = cleanup;
-
-export { cleanup, connectToTRPC, disconnect, getTRPCClient, type AppRouter };
+export { cleanup, connectToTRPC, getTRPCClient, type AppRouter };

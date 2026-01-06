@@ -8,8 +8,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { openDialog } from '@/features/dialogs/actions';
 import { openServerScreen } from '@/features/server-screens/actions';
+import { disconnectFromServer } from '@/features/server/actions';
 import { useServerName } from '@/features/server/hooks';
-import { disconnect } from '@/lib/trpc';
 import { Permission } from '@sharkord/shared';
 import { Menu } from 'lucide-react';
 import { memo, useMemo } from 'react';
@@ -65,7 +65,7 @@ const LeftSidebar = memo(() => {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
               </Protect>
-              <DropdownMenuItem onClick={disconnect}>
+              <DropdownMenuItem onClick={disconnectFromServer}>
                 Disconnect
               </DropdownMenuItem>
             </DropdownMenuContent>

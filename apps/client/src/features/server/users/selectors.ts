@@ -58,3 +58,13 @@ export const userStatusSelector = createSelector(
   [userByIdSelector],
   (user) => user?.status ?? UserStatus.OFFLINE
 );
+
+export const usernamesSelector = createSelector([usersSelector], (users) => {
+  const map: Record<number, string> = {};
+
+  users.forEach((user) => {
+    map[user.id] = user.name;
+  });
+
+  return map;
+});

@@ -6,6 +6,7 @@ import {
   ownUserIdSelector,
   ownUserSelector,
   userByIdSelector,
+  usernamesSelector,
   usersSelector,
   userStatusSelector
 } from './selectors';
@@ -27,3 +28,5 @@ export const useOwnPublicUser = () =>
 
 export const useUserStatus = (userId: number) =>
   useSelector((state: IRootState) => userStatusSelector(state, userId));
+
+export const useUsernames = () => useSelector(usernamesSelector);
