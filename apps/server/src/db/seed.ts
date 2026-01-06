@@ -120,13 +120,6 @@ const seedDatabase = async () => {
       isPersistent: true,
       isDefault: true,
       createdAt: firstStart
-    },
-    {
-      name: 'Guest',
-      color: '#AAAAAA',
-      isPersistent: false,
-      isDefault: false,
-      createdAt: firstStart
     }
   ];
 
