@@ -1,4 +1,5 @@
 import { ActivityLogType, ChannelType, Permission } from '@sharkord/shared';
+import { randomUUIDv7 } from 'bun';
 import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db';
@@ -28,6 +29,8 @@ const addChannelRoute = protectedProcedure
         .limit(1)
         .get();
 
+      const now = Date.now();
+
       const newChannel = await tx
         .insert(channels)
         .values({
@@ -37,8 +40,10 @@ const addChannelRoute = protectedProcedure
               : 0,
           name: input.name,
           type: input.type,
+          fileAccessToken: randomUUIDv7(),
+          fileAccessTokenUpdatedAt: now,
           categoryId: input.categoryId,
-          createdAt: Date.now()
+          createdAt: now
         })
         .returning()
         .get();
@@ -60,6 +65,8 @@ const addChannelRoute = protectedProcedure
         type: channel.type as ChannelType
       }
     });
+
+    return channel.id;
   });
 
 export { addChannelRoute };

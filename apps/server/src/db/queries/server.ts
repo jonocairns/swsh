@@ -23,6 +23,14 @@ const getSettings = async (): Promise<TJoinedSettings> => {
   };
 };
 
+const getServerTokenSync = (): string => {
+  if (!token) {
+    throw new Error('Server token has not been initialized yet');
+  }
+
+  return token;
+};
+
 const getServerToken = async (): Promise<string> => {
   if (token) return token;
 
@@ -37,4 +45,4 @@ const getServerToken = async (): Promise<string> => {
   return token;
 };
 
-export { getServerToken, getSettings };
+export { getServerToken, getServerTokenSync, getSettings };

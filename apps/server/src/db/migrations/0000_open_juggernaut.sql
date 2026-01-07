@@ -75,6 +75,8 @@ CREATE TABLE `channels` (
 	`type` text NOT NULL,
 	`name` text NOT NULL,
 	`topic` text,
+	`file_access_token` text NOT NULL,
+	`file_access_token_updated_at` integer NOT NULL,
 	`private` integer DEFAULT false NOT NULL,
 	`position` integer NOT NULL,
 	`category_id` integer,
@@ -83,6 +85,7 @@ CREATE TABLE `channels` (
 	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `channels_file_access_token_unique` ON `channels` (`file_access_token`);--> statement-breakpoint
 CREATE INDEX `channels_category_idx` ON `channels` (`category_id`);--> statement-breakpoint
 CREATE INDEX `channels_position_idx` ON `channels` (`position`);--> statement-breakpoint
 CREATE INDEX `channels_type_idx` ON `channels` (`type`);--> statement-breakpoint

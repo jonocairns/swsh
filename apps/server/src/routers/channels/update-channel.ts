@@ -11,9 +11,9 @@ const updateChannelRoute = protectedProcedure
   .input(
     z.object({
       channelId: z.number().min(1),
-      name: z.string().min(2).max(24),
-      topic: z.string().max(128).nullable(),
-      private: z.boolean()
+      name: z.string().min(2).max(24).optional(),
+      topic: z.string().max(128).nullable().optional(),
+      private: z.boolean().optional()
     })
   )
   .mutation(async ({ ctx, input }) => {

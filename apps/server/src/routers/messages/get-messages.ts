@@ -13,11 +13,14 @@ import { db } from '../../db';
 import { getChannelsReadStatesForUser } from '../../db/queries/channels';
 import {
   channelReadStates,
+  channels,
   files,
   messageFiles,
   messageReactions,
   messages
 } from '../../db/schema';
+import { generateFileToken } from '../../helpers/files-crypto';
+import { invariant } from '../../utils/invariant';
 import { pubsub } from '../../utils/pubsub';
 import { protectedProcedure } from '../../utils/trpc';
 
@@ -37,6 +40,20 @@ const getMessagesRoute = protectedProcedure
     );
 
     const { channelId, cursor, limit } = input;
+
+    const channel = await db
+      .select({
+        private: channels.private,
+        fileAccessToken: channels.fileAccessToken
+      })
+      .from(channels)
+      .where(eq(channels.id, channelId))
+      .get();
+
+    invariant(channel, {
+      code: 'NOT_FOUND',
+      message: 'Channel not found'
+    });
 
     const rows: TMessage[] = await db
       .select()
@@ -95,7 +112,23 @@ const getMessagesRoute = protectedProcedure
           acc[row.messageId] = [];
         }
 
-        acc[row.messageId]!.push(row.file);
+        const rowCopy: TFile = { ...row.file };
+
+        if (channel.private) {
+          // when a channel is private, we need to generate access tokens for each file
+          // this allows files to be accessed only by users who have access to the channel
+          // however, if a user decides to share the file link, they can do so and anyone with the link can access it
+          // this is by design
+          // the access token is generated using the channel's file access token
+          // so if an admin wants to invalidate all file links, they can simply regenerate the channel's file access token
+
+          rowCopy._accessToken = generateFileToken(
+            row.file.id,
+            channel.fileAccessToken
+          );
+        }
+
+        acc[row.messageId]!.push(rowCopy);
 
         return acc;
       },

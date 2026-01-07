@@ -1,7 +1,7 @@
 import { FileCard } from '@/components/channel-view/text/file-card';
 import { PaginatedList } from '@/components/paginated-list';
 import { requestConfirmation } from '@/features/dialogs/actions';
-import { downloadFile } from '@/helpers/download-file';
+import { getFileUrl } from '@/helpers/get-file-url';
 import { getTrpcError } from '@/helpers/parse-trpc-errors';
 import { getTRPCClient } from '@/lib/trpc';
 import type { TFile } from '@sharkord/shared';
@@ -15,9 +15,9 @@ const Files = memo(() => {
   const onRemoveClick = useCallback(
     async (fileId: number) => {
       const answer = await requestConfirmation({
-        title: 'Remove File',
-        message: 'Are you sure you want to remove this file?',
-        confirmLabel: 'Remove',
+        title: 'Delete file',
+        message: 'Are you sure you want to delete this file?',
+        confirmLabel: 'Delete',
         cancelLabel: 'Cancel'
       });
 
@@ -27,9 +27,9 @@ const Files = memo(() => {
         const trpc = getTRPCClient();
 
         await trpc.files.delete.mutate({ fileId });
-        toast.success('File removed successfully');
+        toast.success('File deleted successfully');
       } catch (error) {
-        toast.error(getTrpcError(error, 'Failed to remove file'));
+        toast.error(getTrpcError(error, 'Failed to delete file'));
       } finally {
         refetch();
       }
@@ -44,7 +44,7 @@ const Files = memo(() => {
         extension={file.extension}
         size={file.size}
         onRemove={() => onRemoveClick(file.id)}
-        onDownload={() => downloadFile(file)}
+        href={getFileUrl(file)}
       />
     ),
     [onRemoveClick]
