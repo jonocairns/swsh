@@ -26,7 +26,9 @@ export type TSettings = InferSelectModel<typeof settings>;
 export type TRole = InferSelectModel<typeof roles>;
 export type TCategory = InferSelectModel<typeof categories>;
 export type TChannel = InferSelectModel<typeof channels>;
-export type TFile = InferSelectModel<typeof files>;
+export type TFile = InferSelectModel<typeof files> & {
+  _accessToken?: string;
+};
 export type TUser = InferSelectModel<typeof users>;
 export type TLogin = InferSelectModel<typeof logins>;
 export type TMessage = InferSelectModel<typeof messages>;

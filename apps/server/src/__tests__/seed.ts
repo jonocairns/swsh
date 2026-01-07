@@ -69,6 +69,8 @@ const seedDatabase = async (db: BunSQLiteDatabase) => {
       type: ChannelType.TEXT,
       name: 'General',
       position: 0,
+      fileAccessToken: randomUUIDv7(),
+      fileAccessTokenUpdatedAt: Date.now(),
       categoryId: 1,
       topic: 'General text channel',
       createdAt: firstStart
@@ -77,6 +79,8 @@ const seedDatabase = async (db: BunSQLiteDatabase) => {
       type: ChannelType.VOICE,
       name: 'Voice',
       position: 0,
+      fileAccessToken: randomUUIDv7(),
+      fileAccessTokenUpdatedAt: Date.now(),
       categoryId: 2,
       topic: 'General voice channel',
       createdAt: firstStart

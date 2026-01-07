@@ -4,6 +4,7 @@ import type { TServerScreenBaseProps } from '../screens';
 import { ServerScreenLayout } from '../server-screen-layout';
 import { General } from './general';
 import { ChannelPermissions } from './permissions';
+import { Security } from './security';
 
 type TChannelSettingsProps = TServerScreenBaseProps & {
   channelId: number;
@@ -17,6 +18,7 @@ const ChannelSettings = memo(({ close, channelId }: TChannelSettingsProps) => {
           <TabsList className="mb-6">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="permissions">Permissions</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-6">
@@ -24,6 +26,9 @@ const ChannelSettings = memo(({ close, channelId }: TChannelSettingsProps) => {
           </TabsContent>
           <TabsContent value="permissions" className="space-y-6">
             <ChannelPermissions channelId={channelId} />
+          </TabsContent>
+          <TabsContent value="security" className="space-y-6">
+            <Security channelId={channelId} />
           </TabsContent>
         </Tabs>
       </div>

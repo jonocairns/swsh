@@ -23,6 +23,7 @@ export enum ActivityLogType {
   UPDATED_CHANNEL = "UPDATED_CHANNEL",
   UPDATED_CHANNEL_PERMISSIONS = "UPDATED_CHANNEL_PERMISSIONS",
   DELETED_CHANNEL_PERMISSIONS = "DELETED_CHANNEL_PERMISSIONS",
+  ROTATE_CHANNEL_FILE_ACCESS_TOKEN = "ROTATE_CHANNEL_FILE_ACCESS_TOKEN",
   // -------------------- INVITES --------------------
   CREATED_INVITE = "CREATED_INVITE",
   DELETED_INVITE = "DELETED_INVITE",
@@ -112,6 +113,9 @@ export type TActivityLogDetailsMap = {
     channelId: number;
     targetUserId?: number;
     targetRoleId?: number;
+  };
+  [ActivityLogType.ROTATE_CHANNEL_FILE_ACCESS_TOKEN]: {
+    channelId: number;
   };
   // -------------------- INVITES --------------------
   [ActivityLogType.CREATED_INVITE]: {

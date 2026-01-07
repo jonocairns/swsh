@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "18adab32-a140-4a13-b410-fec2dfb47c21",
+  "id": "8b301ca5-287d-4425-ada0-3eed32ebff0f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "activity_log": {
@@ -552,6 +552,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "file_access_token": {
+          "name": "file_access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "file_access_token_updated_at": {
+          "name": "file_access_token_updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "private": {
           "name": "private",
           "type": "integer",
@@ -590,6 +604,13 @@
         }
       },
       "indexes": {
+        "channels_file_access_token_unique": {
+          "name": "channels_file_access_token_unique",
+          "columns": [
+            "file_access_token"
+          ],
+          "isUnique": true
+        },
         "channels_category_idx": {
           "name": "channels_category_idx",
           "columns": [

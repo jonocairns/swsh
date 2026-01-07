@@ -13,6 +13,7 @@ import { getChannelRoute } from './get-channel';
 import { getPermissionsRoute } from './get-permissions';
 import { markAsReadRoute } from './mark-as-read';
 import { reorderChannelsRoute } from './reorder-channels';
+import { rotateFileAccessTokenRoute } from './rotate-file-access-token';
 import { updateChannelRoute } from './update-channel';
 import { updatePermissionsRoute } from './update-permission';
 
@@ -26,6 +27,7 @@ export const channelsRouter = t.router({
   deletePermissions: deletePermissionsRoute,
   reorder: reorderChannelsRoute,
   markAsRead: markAsReadRoute,
+  rotateFileAccessToken: rotateFileAccessTokenRoute,
   onCreate: onChannelCreateRoute,
   onDelete: onChannelDeleteRoute,
   onUpdate: onChannelUpdateRoute,

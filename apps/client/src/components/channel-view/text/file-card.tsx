@@ -37,33 +37,41 @@ type TFileCardProps = {
   name: string;
   size: number;
   extension: string;
+  href?: string;
   onRemove?: () => void;
-  onDownload?: () => void;
 };
 
 const FileCard = ({
-  onDownload,
   name,
   size,
   extension,
+  href,
   onRemove
 }: TFileCardProps) => {
-  const onDownloadClick = useCallback(() => {
-    onDownload?.();
-  }, [onDownload]);
+  const onRemoveClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (onRemove) {
+        e.preventDefault();
+        onRemove();
+      }
+    },
+    [onRemove]
+  );
 
   return (
-    <div className="flex max-w-sm items-center gap-3 rounded-lg border border-border p-2 select-none">
-      <div className="flex shrink-0 items-center justify-center rounded">
+    <a
+      className="flex max-w-sm items-center gap-3 rounded-lg border border-border bg-background p-2 select-none transition-all duration-200 hover:border-primary/50 hover:bg-accent hover:shadow-md"
+      href={href}
+      target="_blank"
+    >
+      <div className="flex shrink-0 items-center justify-center rounded-md bg-muted p-2 transition-colors duration-200">
         <FileIcon extension={extension} />
       </div>
       <div className="flex flex-1 flex-col overflow-hidden">
         <span
           className={cn(
-            'truncate text-sm font-medium text-foregroun',
-            onDownload && 'hover:underline cursor-pointer'
+            'truncate text-sm font-medium text-foreground transition-colors duration-200'
           )}
-          onClick={onDownloadClick}
         >
           {name}
         </span>
@@ -73,13 +81,13 @@ const FileCard = ({
         <Button
           size="icon"
           variant="ghost"
-          className="h-8 w-8 shrink-0"
-          onClick={onRemove}
+          className="h-8 w-8 shrink-0 transition-opacity duration-200"
+          onClick={onRemoveClick}
         >
           <Trash className="h-4 w-4" />
         </Button>
       )}
-    </div>
+    </a>
   );
 };
 

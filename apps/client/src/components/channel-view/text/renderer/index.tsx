@@ -1,5 +1,5 @@
+import { requestConfirmation } from '@/features/dialogs/actions';
 import { useOwnUserId } from '@/features/server/users/hooks';
-import { downloadFile } from '@/helpers/download-file';
 import { getFileUrl } from '@/helpers/get-file-url';
 import { getTRPCClient } from '@/lib/trpc';
 import { imageExtensions, type TJoinedMessage } from '@sharkord/shared';
@@ -36,6 +36,14 @@ const MessageRenderer = memo(({ message }: TMessageRendererProps) => {
 
   const onRemoveFileClick = useCallback(async (fileId: number) => {
     if (!fileId) return;
+
+    const choice = await requestConfirmation({
+      title: 'Delete file',
+      message: 'Are you sure you want to delete this file?',
+      confirmLabel: 'Delete'
+    });
+
+    if (!choice) return;
 
     const trpc = getTRPCClient();
 
@@ -88,7 +96,7 @@ const MessageRenderer = memo(({ message }: TMessageRendererProps) => {
               onRemove={
                 isOwnMessage ? () => onRemoveFileClick(file.id) : undefined
               }
-              onDownload={() => downloadFile(file)}
+              href={getFileUrl(file)}
             />
           ))}
         </div>

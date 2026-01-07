@@ -4,7 +4,9 @@ import http from 'http';
 import path from 'path';
 import { db } from '../db';
 import { isFileOrphaned } from '../db/queries/files';
-import { files } from '../db/schema';
+import { getMessageByFileId } from '../db/queries/messages';
+import { channels, files } from '../db/schema';
+import { verifyFileToken } from '../helpers/files-crypto';
 import { PUBLIC_PATH } from '../helpers/paths';
 import { logger } from '../logger';
 
@@ -18,7 +20,8 @@ const publicRouteHandler = async (
     return;
   }
 
-  const fileName = decodeURIComponent(path.basename(req.url));
+  const url = new URL(req.url!, `http://${req.headers.host}`);
+  const fileName = decodeURIComponent(path.basename(url.pathname));
 
   const dbFile = await db
     .select()
@@ -38,6 +41,34 @@ const publicRouteHandler = async (
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'File not found' }));
     return;
+  }
+
+  // it's gonna be defined if it's a message file
+  // otherwise is something like an avatar or banner or something else
+  // we can assume this because of the orphaned check above
+  const associatedMessage = await getMessageByFileId(dbFile.id);
+
+  if (associatedMessage) {
+    const channel = await db
+      .select()
+      .from(channels)
+      .where(eq(channels.id, associatedMessage.channelId))
+      .get();
+
+    if (channel && channel.private) {
+      const accessToken = url.searchParams.get('accessToken');
+      const isValidToken = verifyFileToken(
+        dbFile.id,
+        channel.fileAccessToken,
+        accessToken || ''
+      );
+
+      if (!isValidToken) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Forbidden' }));
+        return;
+      }
+    }
   }
 
   const filePath = path.join(PUBLIC_PATH, dbFile.name);

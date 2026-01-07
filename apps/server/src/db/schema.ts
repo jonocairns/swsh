@@ -67,6 +67,8 @@ const channels = sqliteTable(
     type: text('type').notNull(),
     name: text('name').notNull(),
     topic: text('topic'),
+    fileAccessToken: text('file_access_token').notNull().unique(),
+    fileAccessTokenUpdatedAt: integer('file_access_token_updated_at').notNull(),
     private: integer('private', { mode: 'boolean' }).notNull().default(false),
     position: integer('position').notNull(),
     categoryId: integer('category_id').references(() => categories.id, {

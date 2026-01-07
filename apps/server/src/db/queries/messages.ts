@@ -7,7 +7,14 @@ import type {
 } from '@sharkord/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '..';
-import { files, messageFiles, messageReactions, messages } from '../schema';
+import { generateFileToken } from '../../helpers/files-crypto';
+import {
+  channels,
+  files,
+  messageFiles,
+  messageReactions,
+  messages
+} from '../schema';
 
 const getMessageByFileId = async (
   fileId: number
@@ -34,6 +41,18 @@ const getMessage = async (
 
   if (!message) return undefined;
 
+  const channel = await db
+    .select({
+      fileAccessToken: channels.fileAccessToken,
+      private: channels.private
+    })
+    .from(channels)
+    .where(eq(channels.id, message.channelId))
+    .limit(1)
+    .get();
+
+  if (!channel) return undefined;
+
   const fileRows = await db
     .select({
       file: files
@@ -42,7 +61,16 @@ const getMessage = async (
     .innerJoin(files, eq(messageFiles.fileId, files.id))
     .where(eq(messageFiles.messageId, messageId));
 
-  const filesForMessage: TFile[] = fileRows.map((r) => r.file);
+  const filesForMessage: TFile[] = fileRows.map((r) => {
+    if (channel.private) {
+      return {
+        ...r.file,
+        _accessToken: generateFileToken(r.file.id, channel.fileAccessToken)
+      };
+    }
+
+    return r.file;
+  });
 
   const reactionRows = await db
     .select({

@@ -32,7 +32,7 @@ const createHttpServer = async (port: number = config.server.port) => {
         );
 
         if (req.method === 'OPTIONS') {
-          res.writeHead(200);
+          res.writeHead(204);
           res.end();
           return;
         }

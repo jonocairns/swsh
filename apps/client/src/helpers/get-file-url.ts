@@ -26,7 +26,13 @@ const getFileUrl = (file: TFile | undefined | null) => {
 
   const url = getUrlFromServer();
 
-  return encodeURI(`${url}/public/${file.name}`);
+  let baseUrl = `${url}/public/${file.name}`;
+
+  if (file._accessToken) {
+    baseUrl += `?accessToken=${file._accessToken}`;
+  }
+
+  return encodeURI(baseUrl);
 };
 
 export { getFileUrl, getHostFromServer, getUrlFromServer };

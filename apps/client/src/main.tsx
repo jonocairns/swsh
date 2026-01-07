@@ -1,4 +1,5 @@
 import { Toaster } from '@/components/ui/sonner';
+import 'prosemirror-view/style/prosemirror.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
@@ -12,7 +13,6 @@ import { ThemeProvider } from './components/theme-provider/index.tsx';
 import { store } from './features/store.ts';
 import { LocalStorageKey } from './helpers/storage.ts';
 import './index.css';
-import 'prosemirror-view/style/prosemirror.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

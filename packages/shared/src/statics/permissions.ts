@@ -13,7 +13,6 @@ export enum Permission {
   MANAGE_EMOJIS = "MANAGE_EMOJIS",
   MANAGE_SETTINGS = "MANAGE_SETTINGS",
   MANAGE_USERS = "MANAGE_USERS",
-  MANAGE_FILES = "MANAGE_FILES",
   MANAGE_MESSAGES = "MANAGE_MESSAGES",
   MANAGE_STORAGE = "MANAGE_STORAGE",
   MANAGE_INVITES = "MANAGE_INVITES",
@@ -34,7 +33,6 @@ export const permissionLabels: Record<Permission, string> = {
   [Permission.MANAGE_EMOJIS]: "Manage emojis",
   [Permission.MANAGE_SETTINGS]: "Manage server settings",
   [Permission.MANAGE_USERS]: "Manage users",
-  [Permission.MANAGE_FILES]: "Manage files",
   [Permission.MANAGE_MESSAGES]: "Manage messages",
   [Permission.MANAGE_STORAGE]: "Manage storage",
   [Permission.MANAGE_INVITES]: "Manage invites",
@@ -62,7 +60,6 @@ export const permissionDescriptions: Record<Permission, string> = {
     "Grants the ability to create, update, and delete emojis.",
   [Permission.MANAGE_SETTINGS]: "Grants the ability to manage server settings.",
   [Permission.MANAGE_USERS]: "Grants the ability to manage users.",
-  [Permission.MANAGE_FILES]: "Grants the ability to manage files.",
   [Permission.MANAGE_MESSAGES]:
     "Grants the ability to manage messages from all users by editing or deleting them.",
   [Permission.MANAGE_STORAGE]:

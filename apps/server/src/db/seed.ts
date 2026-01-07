@@ -76,6 +76,8 @@ const seedDatabase = async () => {
       type: ChannelType.TEXT,
       name: 'General Text',
       position: 0,
+      fileAccessToken: randomUUIDv7(),
+      fileAccessTokenUpdatedAt: Date.now(),
       categoryId: 1,
       topic: 'General text channel',
       createdAt: firstStart
@@ -84,6 +86,8 @@ const seedDatabase = async () => {
       type: ChannelType.TEXT,
       name: 'General Text 2',
       position: 1,
+      fileAccessToken: randomUUIDv7(),
+      fileAccessTokenUpdatedAt: Date.now(),
       categoryId: 1,
       topic: 'General text channel 2',
       createdAt: firstStart
@@ -92,6 +96,8 @@ const seedDatabase = async () => {
       type: ChannelType.VOICE,
       name: 'General Voice',
       position: 0,
+      fileAccessToken: randomUUIDv7(),
+      fileAccessTokenUpdatedAt: Date.now(),
       categoryId: 2,
       topic: 'General voice channel',
       createdAt: firstStart
@@ -100,6 +106,8 @@ const seedDatabase = async () => {
       type: ChannelType.VOICE,
       name: 'General Voice 2',
       position: 1,
+      fileAccessToken: randomUUIDv7(),
+      fileAccessTokenUpdatedAt: Date.now(),
       categoryId: 2,
       topic: 'General voice channel 2',
       createdAt: firstStart
