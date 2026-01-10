@@ -7,7 +7,7 @@ const logVoice = (...args: unknown[]) => {
 };
 
 const logDebug = (...args: unknown[]) => {
-  if (window.DEBUG || true) {
+  if (window.DEBUG) {
     console.log('%c[DEBUG]', 'color: lightblue; font-weight: bold;', ...args);
   }
 };

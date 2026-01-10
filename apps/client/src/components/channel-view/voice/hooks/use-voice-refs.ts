@@ -4,7 +4,7 @@ import { StreamKind } from '@sharkord/shared';
 import { useEffect, useMemo, useRef } from 'react';
 import { useAudioLevel } from './use-audio-level';
 
-const useVoiceRefs = (userId: number) => {
+const useVoiceRefs = (remoteId: number) => {
   const {
     remoteUserStreams,
     externalStreams,
@@ -13,7 +13,7 @@ const useVoiceRefs = (userId: number) => {
     localScreenShareStream,
     ownVoiceState
   } = useVoice();
-  const isOwnUser = useIsOwnUser(userId);
+  const isOwnUser = useIsOwnUser(remoteId);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -24,38 +24,46 @@ const useVoiceRefs = (userId: number) => {
   const videoStream = useMemo(() => {
     if (isOwnUser) return localVideoStream;
 
-    return remoteUserStreams[userId]?.[StreamKind.VIDEO];
-  }, [remoteUserStreams, userId, isOwnUser, localVideoStream]);
+    return remoteUserStreams[remoteId]?.[StreamKind.VIDEO];
+  }, [remoteUserStreams, remoteId, isOwnUser, localVideoStream]);
 
   const audioStream = useMemo(() => {
     if (isOwnUser) return undefined;
 
-    return remoteUserStreams[userId]?.[StreamKind.AUDIO];
-  }, [remoteUserStreams, userId, isOwnUser]);
+    return remoteUserStreams[remoteId]?.[StreamKind.AUDIO];
+  }, [remoteUserStreams, remoteId, isOwnUser]);
 
   const audioStreamForLevel = useMemo(() => {
     if (isOwnUser) return localAudioStream;
 
-    return remoteUserStreams[userId]?.[StreamKind.AUDIO];
-  }, [remoteUserStreams, userId, isOwnUser, localAudioStream]);
+    return remoteUserStreams[remoteId]?.[StreamKind.AUDIO];
+  }, [remoteUserStreams, remoteId, isOwnUser, localAudioStream]);
 
   const screenShareStream = useMemo(() => {
     if (isOwnUser) return localScreenShareStream;
 
-    return remoteUserStreams[userId]?.[StreamKind.SCREEN];
-  }, [remoteUserStreams, userId, isOwnUser, localScreenShareStream]);
+    return remoteUserStreams[remoteId]?.[StreamKind.SCREEN];
+  }, [remoteUserStreams, remoteId, isOwnUser, localScreenShareStream]);
 
   const externalAudioStream = useMemo(() => {
     if (isOwnUser) return undefined;
 
-    return externalStreams[userId];
-  }, [externalStreams, userId, isOwnUser]);
+    const external = externalStreams[remoteId];
+
+    return external?.kind === StreamKind.EXTERNAL_AUDIO
+      ? external.stream
+      : undefined;
+  }, [externalStreams, remoteId, isOwnUser]);
 
   const externalVideoStream = useMemo(() => {
     if (isOwnUser) return undefined;
 
-    return externalStreams[userId];
-  }, [externalStreams, userId, isOwnUser]);
+    const external = externalStreams[remoteId];
+
+    return external?.kind === StreamKind.EXTERNAL_VIDEO
+      ? external.stream
+      : undefined;
+  }, [externalStreams, remoteId, isOwnUser]);
 
   const { audioLevel, isSpeaking, speakingIntensity } =
     useAudioLevel(audioStreamForLevel);

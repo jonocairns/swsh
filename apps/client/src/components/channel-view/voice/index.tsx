@@ -1,5 +1,5 @@
 import { useVoiceUsersByChannelId } from '@/features/server/hooks';
-import { useVoice } from '@/features/server/voice/hooks';
+import { useVoiceChannelExternalStreamsList } from '@/features/server/voice/hooks';
 import { memo, useMemo } from 'react';
 import { ExternalVideoCard } from './external-video-card';
 import {
@@ -16,10 +16,8 @@ type TChannelProps = {
 
 const VoiceChannel = memo(({ channelId }: TChannelProps) => {
   const voiceUsers = useVoiceUsersByChannelId(channelId);
-  const { externalStreams } = useVoice();
+  const externalStreams = useVoiceChannelExternalStreamsList(channelId);
   const { pinnedCard, pinCard, unpinCard, isPinned } = usePinCardController();
-
-  console.log('! externalStreams', externalStreams);
 
   const cards = useMemo(() => {
     const cards: React.ReactNode[] = [];
@@ -66,22 +64,23 @@ const VoiceChannel = memo(({ channelId }: TChannelProps) => {
       }
     });
 
-    Object.keys(externalStreams).forEach((streamIdStr) => {
-      const externalVideoCardId = `external-video-${streamIdStr}`;
+    externalStreams.forEach((stream) => {
+      const externalStreamCardId = `external-stream-${stream.streamId}`;
 
       cards.push(
         <ExternalVideoCard
-          key={externalVideoCardId}
-          streamId={+streamIdStr}
-          isPinned={isPinned(externalVideoCardId)}
+          key={externalStreamCardId}
+          streamId={stream.streamId}
+          isPinned={isPinned(externalStreamCardId)}
           onPin={() =>
             pinCard({
-              id: externalVideoCardId,
+              id: externalStreamCardId,
               type: PinnedCardType.EXTERNAL_VIDEO,
-              userId: +streamIdStr
+              userId: stream.streamId
             })
           }
           onUnpin={unpinCard}
+          name={stream.name}
           showPinControls
         />
       );

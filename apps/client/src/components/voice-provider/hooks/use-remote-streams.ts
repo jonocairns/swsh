@@ -1,4 +1,5 @@
 import type { TRemoteStreams, TRemoteUserStreamKinds } from '@/types';
+import { StreamKind } from '@sharkord/shared';
 import { useCallback, useState } from 'react';
 
 const useRemoteStreams = () => {
@@ -6,15 +7,22 @@ const useRemoteStreams = () => {
     {}
   );
   const [externalStreams, setExternalStreams] = useState<{
-    [streamId: number]: MediaStream;
+    [streamId: number]: {
+      stream: MediaStream;
+      kind: StreamKind.EXTERNAL_AUDIO | StreamKind.EXTERNAL_VIDEO;
+    };
   }>({});
 
   const addExternalStream = useCallback(
-    (streamId: number, stream: MediaStream) => {
+    (
+      streamId: number,
+      stream: MediaStream,
+      kind: StreamKind.EXTERNAL_AUDIO | StreamKind.EXTERNAL_VIDEO
+    ) => {
       setExternalStreams((prev) => {
         const newState = { ...prev };
 
-        newState[streamId] = stream;
+        newState[streamId] = { stream, kind };
 
         return newState;
       });
@@ -27,7 +35,7 @@ const useRemoteStreams = () => {
       const streamToRemove = prev[streamId];
 
       if (streamToRemove) {
-        streamToRemove?.getTracks()?.forEach((track) => track?.stop?.());
+        streamToRemove.stream?.getTracks()?.forEach((track) => track?.stop?.());
       }
 
       const newState = { ...prev };
@@ -40,8 +48,8 @@ const useRemoteStreams = () => {
 
   const clearExternalStreams = useCallback(() => {
     setExternalStreams((prev) => {
-      Object.values(prev).forEach((stream) => {
-        stream?.getTracks()?.forEach((track) => track?.stop?.());
+      Object.values(prev).forEach((item) => {
+        item.stream?.getTracks()?.forEach((track) => track?.stop?.());
       });
 
       return {};

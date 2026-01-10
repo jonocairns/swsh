@@ -31,10 +31,24 @@ const onVoiceProducerClosedRoute = protectedProcedure.subscription(
   }
 );
 
+const onVoiceAddExternalStreamRoute = protectedProcedure.subscription(
+  async ({ ctx }) => {
+    return ctx.pubsub.subscribe(ServerEvents.VOICE_ADD_EXTERNAL_STREAM);
+  }
+);
+
+const onVoiceRemoveExternalStreamRoute = protectedProcedure.subscription(
+  async ({ ctx }) => {
+    return ctx.pubsub.subscribe(ServerEvents.VOICE_REMOVE_EXTERNAL_STREAM);
+  }
+);
+
 export {
   onUserJoinVoiceRoute,
   onUserLeaveVoiceRoute,
   onUserUpdateVoiceStateRoute,
+  onVoiceAddExternalStreamRoute,
   onVoiceNewProducerRoute,
-  onVoiceProducerClosedRoute
+  onVoiceProducerClosedRoute,
+  onVoiceRemoveExternalStreamRoute
 };

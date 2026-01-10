@@ -16,8 +16,6 @@ const executeCommandRoute = protectedProcedure
   .mutation(async ({ ctx, input }) => {
     await ctx.needsPermission(Permission.MANAGE_PLUGINS);
 
-    console.log('Executing command', input);
-
     invariant(pluginManager.hasCommand(input.pluginId, input.commandName), {
       code: 'BAD_REQUEST',
       message: `Command "${input.commandName}" not found for plugin "${input.pluginId}"`

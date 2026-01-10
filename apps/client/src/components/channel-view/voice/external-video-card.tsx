@@ -50,6 +50,7 @@ type TExternalVideoCardProps = {
   onUnpin: () => void;
   className?: string;
   showPinControls: boolean;
+  name?: string;
 };
 
 const ExternalVideoCard = memo(
@@ -59,10 +60,10 @@ const ExternalVideoCard = memo(
     onPin,
     onUnpin,
     className,
-    showPinControls = true
+    showPinControls = true,
+    name
   }: TExternalVideoCardProps) => {
-    const { externalVideoRef, hasExternalVideoStream } =
-      useVoiceRefs(streamId);
+    const { externalVideoRef, hasExternalVideoStream } = useVoiceRefs(streamId);
 
     const {
       containerRef,
@@ -134,7 +135,7 @@ const ExternalVideoCard = memo(
           <div className="flex items-center gap-2 min-w-0">
             <Video className="h-4 w-4 text-blue-400 flex-shrink-0" />
             <span className="text-white font-medium text-sm truncate">
-              External Video Stream
+              {name || 'External Video'}
             </span>
             {isZoomEnabled && zoom > 1 && (
               <span className="text-white/70 text-xs ml-auto flex-shrink-0">

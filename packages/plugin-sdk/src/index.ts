@@ -56,9 +56,10 @@ export interface PluginContext {
   actions: {
     voice: {
       getRouter(channelId: number): Router<AppData>;
-      addExternalProducer(
+      addExternalStream(
         channelId: number,
-        type: StreamKind,
+        name: string,
+        type: StreamKind.EXTERNAL_AUDIO | StreamKind.EXTERNAL_VIDEO,
         producer: Producer
       ): number;
       getListenInfo(): {

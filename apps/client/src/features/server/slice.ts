@@ -6,6 +6,8 @@ import type {
   TChannelUserPermissionsMap,
   TCommandInfo,
   TCommandsMapByPlugin,
+  TExternalStream,
+  TExternalStreamsMap,
   TJoinedEmoji,
   TJoinedMessage,
   TJoinedPublicUser,
@@ -39,6 +41,7 @@ export interface IServerState {
     [channelId: number]: number[];
   };
   voiceMap: TVoiceMap;
+  externalStreamsMap: TExternalStreamsMap;
   ownVoiceState: TVoiceUserState;
   pinnedCard: TPinnedCard | undefined;
   channelPermissions: TChannelUserPermissionsMap;
@@ -67,6 +70,7 @@ const initialState: IServerState = {
   loadingInfo: false,
   typingMap: {},
   voiceMap: {},
+  externalStreamsMap: {},
   ownVoiceState: {
     micMuted: false,
     soundMuted: false,
@@ -123,6 +127,7 @@ export const serverSlice = createSlice({
         emojis: TJoinedEmoji[];
         publicSettings: TPublicServerSettings | undefined;
         voiceMap: TVoiceMap;
+        externalStreamsMap: TExternalStreamsMap;
         channelPermissions: TChannelUserPermissionsMap;
         readStates: TReadStateMap;
       }>
@@ -136,6 +141,7 @@ export const serverSlice = createSlice({
       state.ownUserId = action.payload.ownUserId;
       state.publicSettings = action.payload.publicSettings;
       state.voiceMap = action.payload.voiceMap;
+      state.externalStreamsMap = action.payload.externalStreamsMap;
       state.serverId = action.payload.serverId;
       state.channelPermissions = action.payload.channelPermissions;
       state.readStatesMap = action.payload.readStates;
@@ -482,6 +488,32 @@ export const serverSlice = createSlice({
     },
     setPinnedCard: (state, action: PayloadAction<TPinnedCard | undefined>) => {
       state.pinnedCard = action.payload;
+    },
+    addExternalStreamToChannel: (
+      state,
+      action: PayloadAction<{
+        channelId: number;
+        streamId: number;
+        stream: TExternalStream;
+      }>
+    ) => {
+      const { channelId, streamId, stream } = action.payload;
+
+      if (!state.externalStreamsMap[channelId]) {
+        state.externalStreamsMap[channelId] = {};
+      }
+
+      state.externalStreamsMap[channelId][streamId] = stream;
+    },
+    removeExternalStreamFromChannel: (
+      state,
+      action: PayloadAction<{ channelId: number; streamId: number }>
+    ) => {
+      const { channelId, streamId } = action.payload;
+
+      if (!state.externalStreamsMap[channelId]) return;
+
+      delete state.externalStreamsMap[channelId][streamId];
     },
 
     // PLUGINS ------------------------------------------------------------

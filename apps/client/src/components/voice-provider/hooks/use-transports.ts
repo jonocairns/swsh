@@ -22,7 +22,11 @@ type TUseTransportParams = {
     userId: number,
     kind: TRemoteUserStreamKinds
   ) => void;
-  addExternalStream: (streamId: number, stream: MediaStream) => void;
+  addExternalStream: (
+    streamId: number,
+    stream: MediaStream,
+    kind: StreamKind.EXTERNAL_AUDIO | StreamKind.EXTERNAL_VIDEO
+  ) => void;
   removeExternalStream: (streamId: number) => void;
 };
 
@@ -74,26 +78,9 @@ const useTransports = ({
       producerTransport.current.on('connectionstatechange', (state) => {
         logVoice('Producer transport connection state changed', { state });
 
-        if (state === 'failed') {
-          logVoice('Producer transport failed, attempting cleanup');
+        if (state === 'failed' || state === 'disconnected') {
+          logVoice(`Producer transport ${state}`);
           producerTransport.current?.close();
-          producerTransport.current = undefined;
-
-          // TODO: Implement reconnection logic here
-          // This should trigger a reconnection attempt after a delay
-        } else if (state === 'disconnected') {
-          logVoice('Producer transport disconnected, monitoring for recovery');
-
-          // Give some time for automatic recovery before declaring it failed
-          setTimeout(() => {
-            if (producerTransport.current?.connectionState === 'disconnected') {
-              logVoice(
-                'Producer transport still disconnected after timeout, cleaning up'
-              );
-              producerTransport.current?.close();
-              producerTransport.current = undefined;
-            }
-          }, 5000); // 5 second timeout
         } else if (state === 'closed') {
           logVoice('Producer transport closed');
           producerTransport.current = undefined;
@@ -178,10 +165,9 @@ const useTransports = ({
       consumerTransport.current.on('connectionstatechange', (state) => {
         logVoice('Consumer transport connection state changed', { state });
 
-        if (state === 'failed') {
-          logVoice('Consumer transport failed, attempting cleanup');
+        if (state === 'failed' || state === 'disconnected') {
+          logVoice(`Consumer transport ${state}, attempting cleanup`);
 
-          // Clean up all consumers using this transport
           Object.values(consumers.current).forEach((userConsumers) => {
             Object.values(userConsumers).forEach((consumer) => {
               consumer.close();
@@ -191,30 +177,6 @@ const useTransports = ({
 
           consumerTransport.current?.close();
           consumerTransport.current = undefined;
-
-          // TODO: Implement reconnection logic here
-        } else if (state === 'disconnected') {
-          logVoice('Consumer transport disconnected, monitoring for recovery');
-
-          // Give some time for automatic recovery
-          setTimeout(() => {
-            if (consumerTransport.current?.connectionState === 'disconnected') {
-              logVoice(
-                'Consumer transport still disconnected after timeout, cleaning up'
-              );
-
-              // Clean up all consumers
-              Object.values(consumers.current).forEach((userConsumers) => {
-                Object.values(userConsumers).forEach((consumer) => {
-                  consumer.close();
-                });
-              });
-              consumers.current = {};
-
-              consumerTransport.current?.close();
-              consumerTransport.current = undefined;
-            }
-          }, 5000); // 5 second timeout
         } else if (state === 'closed') {
           logVoice('Consumer transport closed');
           consumerTransport.current = undefined;
@@ -333,7 +295,7 @@ const useTransports = ({
           kind === StreamKind.EXTERNAL_VIDEO ||
           kind === StreamKind.EXTERNAL_AUDIO
         ) {
-          addExternalStream(remoteId, stream);
+          addExternalStream(remoteId, stream, kind);
         } else {
           addRemoteUserStream(remoteId, stream, kind);
         }
@@ -398,6 +360,36 @@ const useTransports = ({
     [consume]
   );
 
+  const cleanupTransports = useCallback(() => {
+    logVoice('Cleaning up transports');
+
+    Object.values(consumers.current).forEach((userConsumers) => {
+      Object.values(userConsumers).forEach((consumer) => {
+        if (!consumer.closed) {
+          consumer.close();
+        }
+      });
+    });
+
+    consumers.current = {};
+
+    consumeOperationsInProgress.current.clear();
+
+    if (producerTransport.current && !producerTransport.current.closed) {
+      producerTransport.current.close();
+    }
+
+    producerTransport.current = undefined;
+
+    if (consumerTransport.current && !consumerTransport.current.closed) {
+      consumerTransport.current.close();
+    }
+
+    consumerTransport.current = undefined;
+
+    logVoice('Transports cleanup complete');
+  }, []);
+
   return {
     producerTransport,
     consumerTransport,
@@ -405,7 +397,8 @@ const useTransports = ({
     createProducerTransport,
     createConsumerTransport,
     consume,
-    consumeExistingProducers
+    consumeExistingProducers,
+    cleanupTransports
   };
 };
 

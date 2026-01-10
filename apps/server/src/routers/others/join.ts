@@ -118,6 +118,7 @@ const joinServerRoute = t.procedure
     }
 
     const voiceMap = VoiceRuntime.getVoiceMap();
+    const externalStreamsMap = VoiceRuntime.getExternalStreamsMap();
 
     await db
       .update(users)
@@ -149,7 +150,8 @@ const joinServerRoute = t.procedure
       publicSettings,
       channelPermissions,
       readStates,
-      commands: pluginManager.getCommands()
+      commands: pluginManager.getCommands(),
+      externalStreamsMap
     };
   });
 

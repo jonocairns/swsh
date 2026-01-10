@@ -14,7 +14,10 @@ import {
   useVoiceUsersByChannelId
 } from '@/features/server/hooks';
 import { joinVoice } from '@/features/server/voice/actions';
-import { useVoice } from '@/features/server/voice/hooks';
+import {
+  useVoice,
+  useVoiceChannelExternalStreamsList
+} from '@/features/server/voice/hooks';
 import { getTrpcError } from '@/helpers/parse-trpc-errors';
 import { getTRPCClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -42,6 +45,7 @@ import { Hash, Volume2 } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { ChannelContextMenu } from '../context-menus/channel';
+import { ExternalStream } from './external-stream';
 import { VoiceUser } from './voice-user';
 
 type TVoiceProps = Omit<TItemWrapperProps, 'children'> & {
@@ -50,6 +54,7 @@ type TVoiceProps = Omit<TItemWrapperProps, 'children'> & {
 
 const Voice = memo(({ channel, ...props }: TVoiceProps) => {
   const users = useVoiceUsersByChannelId(channel.id);
+  const externalStreams = useVoiceChannelExternalStreamsList(channel.id);
 
   return (
     <>
@@ -62,10 +67,17 @@ const Voice = memo(({ channel, ...props }: TVoiceProps) => {
           </span>
         )}
       </ItemWrapper>
-      {channel.type === 'VOICE' && users.length > 0 && (
+      {channel.type === 'VOICE' && (
         <div className="ml-6 space-y-1 mt-1">
           {users.map((user) => (
             <VoiceUser key={user.id} userId={user.id} user={user} />
+          ))}
+          {externalStreams.map((stream) => (
+            <ExternalStream
+              key={stream.streamId}
+              name={stream.name}
+              type={stream.type}
+            />
           ))}
         </div>
       )}

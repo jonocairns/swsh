@@ -1,6 +1,8 @@
 import {
+  ServerEvents,
   StreamKind,
   type TChannelState,
+  type TExternalStreamsMap,
   type TRemoteProducerIds,
   type TTransportParams,
   type TVoiceMap,
@@ -20,6 +22,7 @@ import { logger } from '../logger';
 import { eventBus } from '../plugins/event-bus';
 import { IS_PRODUCTION } from '../utils/env';
 import { mediaSoupWorker } from '../utils/mediasoup';
+import { pubsub } from '../utils/pubsub';
 
 const voiceRuntimes = new Map<number, VoiceRuntime>();
 
@@ -119,7 +122,7 @@ type TConsumerMap = {
 
 class VoiceRuntime {
   public readonly id: number;
-  private state: TChannelState = { users: [] };
+  private state: TChannelState = { users: [], externalStreams: {} };
   private router?: Router<AppData>;
   private consumerTransports: TTransportMap = {};
   private producerTransports: TTransportMap = {};
@@ -168,6 +171,20 @@ class VoiceRuntime {
 
         map[channelId].users[user.userId] = user.state;
       });
+    });
+
+    return map;
+  };
+
+  public static getExternalStreamsMap = (): TExternalStreamsMap => {
+    const map: TExternalStreamsMap = {};
+
+    voiceRuntimes.forEach((runtime, channelId) => {
+      if (map[channelId]) {
+        map[channelId] = [];
+      }
+
+      map[channelId] = runtime.getState().externalStreams;
     });
 
     return map;
@@ -536,7 +553,7 @@ class VoiceRuntime {
     });
   };
 
-  public addExternalProducer = (type: StreamKind, producer: Producer) => {
+  private addExternalProducer = (type: StreamKind, producer: Producer) => {
     const id = this.externalCounter++;
 
     if (type === StreamKind.EXTERNAL_VIDEO) {
@@ -546,14 +563,42 @@ class VoiceRuntime {
     }
 
     producer.observer.on('close', () => {
-      if (type === StreamKind.EXTERNAL_VIDEO) {
+      if (!this.state.externalStreams[id]) return;
+
+      delete this.state.externalStreams[id];
+
+      if (this.externalVideoProducers[id]) {
+        this.externalVideoProducers[id].close();
         delete this.externalVideoProducers[id];
-      } else if (type === StreamKind.EXTERNAL_AUDIO) {
+      }
+
+      if (this.externalAudioProducers[id]) {
+        this.externalAudioProducers[id].close();
         delete this.externalAudioProducers[id];
       }
+
+      pubsub.publish(ServerEvents.VOICE_REMOVE_EXTERNAL_STREAM, {
+        channelId: this.id,
+        streamId: id
+      });
     });
 
     return id;
+  };
+
+  public addExternalStream = (
+    name: string,
+    type: StreamKind.EXTERNAL_VIDEO | StreamKind.EXTERNAL_AUDIO,
+    producer: Producer
+  ) => {
+    const streamId = this.addExternalProducer(type, producer);
+
+    this.state.externalStreams[streamId] = {
+      name,
+      type
+    };
+
+    return streamId;
   };
 
   public getRemoteIds = (userId: number): TRemoteProducerIds => {

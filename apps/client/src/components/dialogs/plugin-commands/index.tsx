@@ -173,7 +173,7 @@ const PluginCommandsDialog = memo(
                   </div>
 
                   <div className="border-t p-4 bg-muted/30">
-                    <div className="max-w-2xl flex justify-end gap-2">
+                    <div className="flex justify-start gap-4">
                       <Button variant="outline" onClick={close}>
                         Close
                       </Button>

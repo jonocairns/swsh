@@ -1,4 +1,5 @@
 import type { IceCandidate, IceParameters } from "mediasoup/types";
+import type { StreamKind } from "./types";
 
 export type TVoiceUserState = {
   micMuted: boolean;
@@ -12,8 +13,14 @@ export type TVoiceUser = {
   state: TVoiceUserState;
 };
 
+export type TExternalStream = {
+  name: string;
+  type: StreamKind.EXTERNAL_AUDIO | StreamKind.EXTERNAL_VIDEO;
+};
+
 export type TChannelState = {
   users: TVoiceUser[];
+  externalStreams: { [streamId: number]: TExternalStream };
 };
 
 export type TTransportParams = {
@@ -28,5 +35,11 @@ export type TVoiceMap = {
     users: {
       [userId: number]: TVoiceUserState;
     };
+  };
+};
+
+export type TExternalStreamsMap = {
+  [channelId: number]: {
+    [streamId: number]: TExternalStream;
   };
 };

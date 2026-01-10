@@ -118,7 +118,8 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     localScreenShareProducer,
     setLocalAudioStream,
     setLocalVideoStream,
-    setLocalScreenShare
+    setLocalScreenShare,
+    clearLocalStreams
   } = useLocalStreams();
 
   const {
@@ -127,7 +128,8 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     createProducerTransport,
     createConsumerTransport,
     consume,
-    consumeExistingProducers
+    consumeExistingProducers,
+    cleanupTransports
   } = useTransports({
     addExternalStream,
     removeExternalStream,
@@ -391,6 +393,26 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     devices.screenFramerate
   ]);
 
+  const cleanup = useCallback(() => {
+    logVoice('Running voice provider cleanup');
+
+    stopMonitoring();
+    resetStats();
+    clearLocalStreams();
+    clearRemoteUserStreams();
+    clearExternalStreams();
+    cleanupTransports();
+
+    setConnectionStatus(ConnectionStatus.DISCONNECTED);
+  }, [
+    stopMonitoring,
+    resetStats,
+    clearLocalStreams,
+    clearRemoteUserStreams,
+    clearExternalStreams,
+    cleanupTransports
+  ]);
+
   const init = useCallback(
     async (
       incomingRouterRtpCapabilities: RtpCapabilities,
@@ -400,6 +422,8 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
         incomingRouterRtpCapabilities,
         channelId
       });
+
+      cleanup();
 
       try {
         setLoading(true);
@@ -432,6 +456,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
       }
     },
     [
+      cleanup,
       createProducerTransport,
       createConsumerTransport,
       consumeExistingProducers,
@@ -466,39 +491,9 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
   });
 
   useEffect(() => {
-    const producerTransportRef = producerTransport.current;
-    const consumerTransportRef = consumerTransport.current;
-    const audioProducerRef = localAudioProducer.current;
-    const videoProducerRef = localVideoProducer.current;
-    const screenShareProducerRef = localScreenShareProducer.current;
-
     return () => {
       logVoice('Voice provider unmounting, cleaning up resources');
-
-      localAudioStream?.getTracks().forEach((track) => {
-        track.stop();
-      });
-
-      localVideoStream?.getTracks().forEach((track) => {
-        track.stop();
-      });
-
-      localScreenShareStream?.getTracks().forEach((track) => {
-        track.stop();
-      });
-
-      audioProducerRef?.close();
-      videoProducerRef?.close();
-      screenShareProducerRef?.close();
-
-      clearRemoteUserStreams();
-
-      producerTransportRef?.close();
-      consumerTransportRef?.close();
-
-      stopMonitoring();
-      resetStats();
-      setConnectionStatus(ConnectionStatus.DISCONNECTED);
+      cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

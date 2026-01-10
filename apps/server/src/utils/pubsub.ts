@@ -4,6 +4,7 @@ import type {
   TCategory,
   TChannel,
   TChannelUserPermissionsMap,
+  TExternalStream,
   TJoinedEmoji,
   TJoinedMessage,
   TJoinedPublicUser,
@@ -62,6 +63,15 @@ type Events = {
     channelId: number;
     remoteId: number;
     kind: StreamKind;
+  };
+  [ServerEvents.VOICE_ADD_EXTERNAL_STREAM]: {
+    channelId: number;
+    streamId: number;
+    stream: TExternalStream;
+  };
+  [ServerEvents.VOICE_REMOVE_EXTERNAL_STREAM]: {
+    channelId: number;
+    streamId: number;
   };
   [ServerEvents.VOICE_PRODUCER_CLOSED]: {
     channelId: number;

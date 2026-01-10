@@ -396,7 +396,7 @@ class PluginManager {
 
             return channel.getRouter();
           },
-          addExternalProducer: (channelId, type, producer) => {
+          addExternalStream: (channelId, name, type, producer) => {
             const channel = VoiceRuntime.findById(channelId);
 
             if (!channel) {
@@ -405,16 +405,24 @@ class PluginManager {
               );
             }
 
-            const externalId = channel.addExternalProducer(type, producer);
+            const streamId = channel.addExternalStream(name, type, producer);
 
-            // Publish event to notify connected clients about the new external producer
+            pubsub.publish(ServerEvents.VOICE_ADD_EXTERNAL_STREAM, {
+              channelId,
+              streamId,
+              stream: {
+                name,
+                type
+              }
+            });
+
             pubsub.publish(ServerEvents.VOICE_NEW_PRODUCER, {
               channelId,
-              remoteId: externalId,
+              remoteId: streamId,
               kind: type
             });
 
-            return externalId;
+            return streamId;
           },
           getListenInfo: () => VoiceRuntime.getListenInfo()
         }
@@ -427,7 +435,6 @@ class PluginManager {
 
           const pluginCommands = this.commands.get(pluginId)!;
 
-          // Check if command already exists
           const existingIndex = pluginCommands.findIndex(
             (c) => c.name === command.name
           );
