@@ -19,7 +19,14 @@ import { getTrpcError } from '@/helpers/parse-trpc-errors';
 import { getTRPCClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import type { TPluginInfo } from '@sharkord/shared';
-import { AlertCircle, FileText, Package, Terminal, User } from 'lucide-react';
+import {
+  AlertCircle,
+  FileText,
+  Package,
+  RefreshCw,
+  Terminal,
+  User
+} from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -166,6 +173,19 @@ const PluginItem = memo(({ plugin, onToggle }: TPluginItemProps) => {
 const Plugins = memo(() => {
   const enabled = usePluginsEnabled();
   const { loading, plugins, refetch } = useAdminPlugins();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      toast.success('Plugins list refreshed');
+    } catch (error) {
+      toast.error(getTrpcError(error, 'Failed to refresh plugins list'));
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch]);
 
   const handleToggle = useCallback(
     async (pluginId: string, enabled: boolean) => {
@@ -192,11 +212,27 @@ const Plugins = memo(() => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Plugins</CardTitle>
-        <CardDescription>
-          Manage installed plugins and extend your Sharkord server with
-          additional features and functionality.
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Plugins</CardTitle>
+            <CardDescription>
+              Manage installed plugins and extend your Sharkord server with
+              additional features and functionality.
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing || loading}
+            className="shrink-0"
+          >
+            <RefreshCw
+              className={cn('w-4 h-4 mr-2', isRefreshing && 'animate-spin')}
+            />
+            Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {enabled ? (
