@@ -5,6 +5,7 @@ import {
 } from '@sharkord/shared';
 import { eq } from 'drizzle-orm';
 import { db } from '.';
+import { pluginManager } from '../plugins';
 import { pubsub } from '../utils/pubsub';
 import {
   getAffectedUserIdsForChannel,
@@ -209,12 +210,19 @@ const publishChannelPermissions = async (affectedUserIds: number[]) => {
   }
 };
 
+const publishPluginCommands = async () => {
+  const commands = pluginManager.getCommands();
+
+  pubsub.publish(ServerEvents.PLUGIN_COMMANDS_CHANGE, commands);
+};
+
 export {
   publishCategory,
   publishChannel,
   publishChannelPermissions,
   publishEmoji,
   publishMessage,
+  publishPluginCommands,
   publishRole,
   publishSettings,
   publishUser

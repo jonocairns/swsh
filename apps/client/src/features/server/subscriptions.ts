@@ -5,6 +5,7 @@ import { subscribeToCategories } from './categories/subscriptions';
 import { subscribeToChannels } from './channels/subscriptions';
 import { subscribeToEmojis } from './emojis/subscriptions';
 import { subscribeToMessages } from './messages/subscriptions';
+import { subscribeToPlugins } from './plugins/subscriptions';
 import { subscribeToRoles } from './roles/subscriptions';
 import { subscribeToUsers } from './users/subscriptions';
 import { subscribeToVoice } from './voice/subscriptions';
@@ -36,7 +37,8 @@ const initSubscriptions = () => {
     subscribeToUsers,
     subscribeToMessages,
     subscribeToVoice,
-    subscribeToCategories
+    subscribeToCategories,
+    subscribeToPlugins
   ];
 
   const unsubscribes = subscriptors.map((subscriptor) => subscriptor());

@@ -5,4 +5,10 @@ const onPluginLogRoute = protectedProcedure.subscription(async ({ ctx }) => {
   return ctx.pubsub.subscribe(ServerEvents.PLUGIN_LOG);
 });
 
-export { onPluginLogRoute };
+const onCommandsChangeRoute = protectedProcedure.subscription(
+  async ({ ctx }) => {
+    return ctx.pubsub.subscribe(ServerEvents.PLUGIN_COMMANDS_CHANGE);
+  }
+);
+
+export { onCommandsChangeRoute, onPluginLogRoute };

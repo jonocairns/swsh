@@ -2,56 +2,14 @@ import { beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import fs from 'fs/promises';
 import path from 'path';
 import { pluginManager } from '..';
+import { loadMockedPlugins, resetPluginMocks } from '../../__tests__/mocks';
 import { tdb } from '../../__tests__/setup';
 import { settings } from '../../db/schema';
 import { PLUGINS_PATH } from '../../helpers/paths';
 
 describe('plugin-manager', () => {
-  beforeAll(async () => {
-    const mocksPath = path.join(__dirname, 'mocks');
-    const plugins = await fs.readdir(mocksPath);
-
-    for (const plugin of plugins) {
-      const src = path.join(mocksPath, plugin);
-      const dest = path.join(PLUGINS_PATH, plugin);
-
-      await fs.cp(src, dest, { recursive: true });
-    }
-
-    await fs.writeFile(
-      path.join(PLUGINS_PATH, 'plugin-states.json'),
-      JSON.stringify({
-        'plugin-a': true,
-        'plugin-b': true,
-        'plugin-with-events': true
-      })
-    );
-  });
-
-  beforeEach(async () => {
-    // enable plugins in settings
-    await tdb.update(settings).set({ enablePlugins: true });
-
-    // unload all plugins before each test
-    await pluginManager.unloadPlugins();
-
-    // reset plugin states - enable test plugins
-    await fs.writeFile(
-      path.join(PLUGINS_PATH, 'plugin-states.json'),
-      JSON.stringify({
-        'plugin-a': true,
-        'plugin-b': true,
-        'plugin-with-events': true,
-        'plugin-no-unload': true,
-        'plugin-no-onload': true,
-        'plugin-throws-error': true
-      })
-    );
-
-    // reload plugin states into memory
-    await pluginManager.loadPlugins();
-    await pluginManager.unloadPlugins();
-  });
+  beforeAll(loadMockedPlugins);
+  beforeEach(resetPluginMocks);
 
   describe('load', () => {
     test('should load plugin-a correctly', async () => {

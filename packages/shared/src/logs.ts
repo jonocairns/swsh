@@ -38,6 +38,7 @@ export enum ActivityLogType {
   UPDATED_CATEGORY = "UPDATED_CATEGORY",
   // -------------------- PLUGINS --------------------
   EXECUTED_PLUGIN_COMMAND = "EXECUTED_PLUGIN_COMMAND",
+  PLUGIN_TOGGLED = "PLUGIN_TOGGLED",
 }
 
 export type TActivityLogDetailsMap = {
@@ -163,6 +164,10 @@ export type TActivityLogDetailsMap = {
     pluginId: string;
     commandName: string;
     args: Record<string, any>;
+  };
+  [ActivityLogType.PLUGIN_TOGGLED]: {
+    pluginId: string;
+    enabled: boolean;
   };
 };
 

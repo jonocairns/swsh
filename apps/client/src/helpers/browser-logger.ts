@@ -6,7 +6,7 @@ const logVoice = (...args: unknown[]) => {
   );
 };
 
-const OVERRIDE_DEBUG = false;
+const OVERRIDE_DEBUG = true;
 
 const logDebug = (...args: unknown[]) => {
   if (window.DEBUG || OVERRIDE_DEBUG) {

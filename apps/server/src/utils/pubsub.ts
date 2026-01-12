@@ -4,6 +4,7 @@ import type {
   TCategory,
   TChannel,
   TChannelUserPermissionsMap,
+  TCommandsMapByPlugin,
   TExternalStream,
   TJoinedEmoji,
   TJoinedMessage,
@@ -80,6 +81,7 @@ type Events = {
   };
 
   [ServerEvents.PLUGIN_LOG]: TLogEntry;
+  [ServerEvents.PLUGIN_COMMANDS_CHANGE]: TCommandsMapByPlugin;
 
   [ServerEvents.EMOJI_CREATE]: TJoinedEmoji;
   [ServerEvents.EMOJI_UPDATE]: TJoinedEmoji;
