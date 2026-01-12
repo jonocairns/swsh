@@ -27,6 +27,16 @@ import { useTransports } from './hooks/use-transports';
 import { useVoiceControls } from './hooks/use-voice-controls';
 import { useVoiceEvents } from './hooks/use-voice-events';
 
+type AudioVideoRefs = {
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
+  screenShareRef: React.RefObject<HTMLVideoElement | null>;
+  externalAudioRef: React.RefObject<HTMLAudioElement | null>;
+  externalVideoRef: React.RefObject<HTMLVideoElement | null>;
+};
+
+export type { AudioVideoRefs };
+
 enum ConnectionStatus {
   DISCONNECTED = 'disconnected',
   CONNECTING = 'connecting',
@@ -38,6 +48,8 @@ export type TVoiceProvider = {
   loading: boolean;
   connectionStatus: ConnectionStatus;
   transportStats: TransportStatsData;
+  audioVideoRefsMap: Map<number, AudioVideoRefs>;
+  getOrCreateRefs: (remoteId: number) => AudioVideoRefs;
   init: (
     routerRtpCapabilities: RtpCapabilities,
     channelId: number
@@ -66,6 +78,14 @@ const VoiceProviderContext = createContext<TVoiceProvider>({
     averageBitrateReceived: 0,
     averageBitrateSent: 0
   },
+  audioVideoRefsMap: new Map(),
+  getOrCreateRefs: () => ({
+    videoRef: { current: null },
+    audioRef: { current: null },
+    screenShareRef: { current: null },
+    externalAudioRef: { current: null },
+    externalVideoRef: { current: null }
+  }),
   init: () => Promise.resolve(),
   toggleMic: () => Promise.resolve(),
   toggleSound: () => Promise.resolve(),
@@ -95,7 +115,22 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     ConnectionStatus.DISCONNECTED
   );
   const routerRtpCapabilities = useRef<RtpCapabilities | null>(null);
+  const audioVideoRefsMap = useRef<Map<number, AudioVideoRefs>>(new Map());
   const { devices } = useDevices();
+
+  const getOrCreateRefs = useCallback((remoteId: number): AudioVideoRefs => {
+    if (!audioVideoRefsMap.current.has(remoteId)) {
+      audioVideoRefsMap.current.set(remoteId, {
+        videoRef: { current: null },
+        audioRef: { current: null },
+        screenShareRef: { current: null },
+        externalAudioRef: { current: null },
+        externalVideoRef: { current: null }
+      });
+    }
+
+    return audioVideoRefsMap.current.get(remoteId)!;
+  }, []);
 
   const {
     addExternalStream,
@@ -503,6 +538,8 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
       loading,
       connectionStatus,
       transportStats,
+      audioVideoRefsMap: audioVideoRefsMap.current,
+      getOrCreateRefs,
       init,
 
       toggleMic,
@@ -522,6 +559,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
       loading,
       connectionStatus,
       transportStats,
+      getOrCreateRefs,
       init,
 
       toggleMic,

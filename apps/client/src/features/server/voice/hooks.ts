@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 import {
   ownVoiceStateSelector,
   pinnedCardSelector,
+  voiceChannelAudioExternalStreamsSelector,
   voiceChannelExternalStreamsListSelector,
   voiceChannelExternalStreamsSelector,
   voiceChannelStateSelector
@@ -23,6 +24,11 @@ export const useVoiceChannelExternalStreams = (channelId: number) =>
 export const useVoiceChannelExternalStreamsList = (channelId: number) =>
   useSelector((state: IRootState) =>
     voiceChannelExternalStreamsListSelector(state, channelId)
+  );
+
+export const useVoiceChannelAudioExternalStreams = (channelId: number) =>
+  useSelector((state: IRootState) =>
+    voiceChannelAudioExternalStreamsSelector(state, channelId)
   );
 
 export const useVoice = () => {

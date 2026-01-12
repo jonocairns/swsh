@@ -1,7 +1,7 @@
 import { useIsOwnUser } from '@/features/server/users/hooks';
 import { useVoice } from '@/features/server/voice/hooks';
 import { StreamKind } from '@sharkord/shared';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useAudioLevel } from './use-audio-level';
 
 const useVoiceRefs = (remoteId: number) => {
@@ -11,15 +11,13 @@ const useVoiceRefs = (remoteId: number) => {
     localAudioStream,
     localVideoStream,
     localScreenShareStream,
-    ownVoiceState
+    ownVoiceState,
+    getOrCreateRefs
   } = useVoice();
   const isOwnUser = useIsOwnUser(remoteId);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const screenShareRef = useRef<HTMLVideoElement>(null);
-  const externalAudioRef = useRef<HTMLAudioElement>(null);
-  const externalVideoRef = useRef<HTMLVideoElement>(null);
+  const { videoRef, audioRef, screenShareRef, externalAudioRef, externalVideoRef } =
+    getOrCreateRefs(remoteId);
 
   const videoStream = useMemo(() => {
     if (isOwnUser) return localVideoStream;
@@ -72,37 +70,37 @@ const useVoiceRefs = (remoteId: number) => {
     if (!videoStream || !videoRef.current) return;
 
     videoRef.current.srcObject = videoStream;
-  }, [videoStream]);
+  }, [videoStream, videoRef]);
 
   useEffect(() => {
     if (!audioStream || !audioRef.current) return;
 
     audioRef.current.srcObject = audioStream;
-  }, [audioStream]);
+  }, [audioStream, audioRef]);
 
   useEffect(() => {
     if (!screenShareStream || !screenShareRef.current) return;
 
     screenShareRef.current.srcObject = screenShareStream;
-  }, [screenShareStream]);
+  }, [screenShareStream, screenShareRef]);
 
   useEffect(() => {
     if (!audioRef.current) return;
 
     audioRef.current.muted = ownVoiceState.soundMuted;
-  }, [ownVoiceState.soundMuted]);
+  }, [ownVoiceState.soundMuted, audioRef]);
 
   useEffect(() => {
     if (!externalAudioStream || !externalAudioRef.current) return;
 
     externalAudioRef.current.srcObject = externalAudioStream;
-  }, [externalAudioStream]);
+  }, [externalAudioStream, externalAudioRef]);
 
   useEffect(() => {
     if (!externalVideoStream || !externalVideoRef.current) return;
 
     externalVideoRef.current.srcObject = externalVideoStream;
-  }, [externalVideoStream]);
+  }, [externalVideoStream, externalVideoRef]);
 
   return {
     videoRef,

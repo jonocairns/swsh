@@ -12,7 +12,12 @@ const ExternalAudioStream = memo(({ streamId }: TExternalAudioStreamProps) => {
   return (
     <>
       {hasExternalAudioStream && (
-        <audio ref={externalAudioRef} className="hidden" autoPlay />
+        <audio
+          ref={externalAudioRef}
+          className="hidden"
+          autoPlay
+          data-stream-id={streamId}
+        />
       )}
     </>
   );

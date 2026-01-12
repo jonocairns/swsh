@@ -48,6 +48,9 @@ docker run \
   sharkord/sharkord:latest
 ```
 
+> [!IMPORTANT]  
+> If you are planning to use plugins, it's recommended to use Docker since they can execute arbitrary code on the host machine, which may pose security risks.
+
 ### Open the Client
 
 Once the server is running, open your web browser and navigate to [http://localhost:4991](http://localhost:4991) to access the Sharkord client interface. If you're running the server on a different machine, replace `localhost` with the server's IP address or domain name.
