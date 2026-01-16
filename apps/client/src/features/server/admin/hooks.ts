@@ -30,6 +30,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useCan } from '../hooks';
 
+// TODO: review this whole file for optimizations and improvements
+
 export const useAdminGeneral = () => {
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<TTrpcErrors>({});
