@@ -91,38 +91,38 @@ const useVoiceRefs = (
   useEffect(() => {
     if (!audioStream || !audioRef.current) return;
 
-    audioRef.current.srcObject = audioStream;
-  }, [audioStream, audioRef]);
+    if (audioRef.current.srcObject !== audioStream) {
+      audioRef.current.srcObject = audioStream;
+    }
+
+    audioRef.current.volume = userVolume / 100;
+  }, [audioStream, audioRef, userVolume]);
 
   useEffect(() => {
     if (!screenShareStream || !screenShareRef.current) return;
 
-    screenShareRef.current.srcObject = screenShareStream;
+    if (screenShareRef.current.srcObject !== screenShareStream) {
+      screenShareRef.current.srcObject = screenShareStream;
+    }
   }, [screenShareStream, screenShareRef]);
 
   useEffect(() => {
     if (!externalAudioStream || !externalAudioRef.current) return;
 
-    externalAudioRef.current.srcObject = externalAudioStream;
-  }, [externalAudioStream, externalAudioRef]);
+    if (externalAudioRef.current.srcObject !== externalAudioStream) {
+      externalAudioRef.current.srcObject = externalAudioStream;
+    }
+
+    externalAudioRef.current.volume = externalVolume / 100;
+  }, [externalAudioStream, externalAudioRef, externalVolume]);
 
   useEffect(() => {
     if (!externalVideoStream || !externalVideoRef.current) return;
 
-    externalVideoRef.current.srcObject = externalVideoStream;
+    if (externalVideoRef.current.srcObject !== externalVideoStream) {
+      externalVideoRef.current.srcObject = externalVideoStream;
+    }
   }, [externalVideoStream, externalVideoRef]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    audioRef.current.volume = userVolume / 100;
-  }, [userVolume, audioRef]);
-
-  useEffect(() => {
-    if (!externalAudioRef.current) return;
-
-    externalAudioRef.current.volume = externalVolume / 100;
-  }, [externalVolume, externalAudioRef]);
 
   useEffect(() => {
     if (!audioRef.current) return;
