@@ -7,10 +7,11 @@ type TExternalStreamProps = {
   title: string;
   tracks?: TExternalStreamTracks;
   pluginId?: string;
+  avatarUrl?: string;
 };
 
 const ExternalStream = memo(
-  ({ title, tracks, pluginId }: TExternalStreamProps) => {
+  ({ title, tracks, pluginId, avatarUrl }: TExternalStreamProps) => {
     const hasVideo = tracks?.video;
     const hasAudio = tracks?.audio;
 
@@ -21,7 +22,15 @@ const ExternalStream = memo(
             pluginId ? `External Stream (${pluginId})` : 'External Stream'
           }
         >
-          <Router className="h-5 w-5 text-muted-foreground opacity-60" />
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={title}
+              className="h-5 w-5 rounded object-cover"
+            />
+          ) : (
+            <Router className="h-5 w-5 text-muted-foreground opacity-60" />
+          )}
         </Tooltip>
 
         <span className="flex-1 text-muted-foreground truncate text-xs">

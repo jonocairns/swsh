@@ -136,6 +136,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
   const {
     addExternalStreamTrack,
     removeExternalStreamTrack,
+    removeExternalStream,
     clearExternalStreams,
     addRemoteUserStream,
     removeRemoteUserStream,
@@ -522,6 +523,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     consume,
     removeRemoteUserStream,
     removeExternalStreamTrack,
+    removeExternalStream,
     clearRemoteUserStreamsForUser,
     rtpCapabilities: routerRtpCapabilities.current!
   });

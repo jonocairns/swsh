@@ -21,6 +21,7 @@ type TEvents = {
     streamId: number,
     kind: StreamKind.EXTERNAL_AUDIO | StreamKind.EXTERNAL_VIDEO
   ) => void;
+  removeExternalStream: (streamId: number) => void;
   clearRemoteUserStreamsForUser: (userId: number) => void;
   rtpCapabilities: RtpCapabilities;
 };
@@ -29,6 +30,7 @@ const useVoiceEvents = ({
   consume,
   removeRemoteUserStream,
   removeExternalStreamTrack,
+  removeExternalStream,
   clearRemoteUserStreamsForUser,
   rtpCapabilities
 }: TEvents) => {
@@ -42,6 +44,7 @@ const useVoiceEvents = ({
     }
 
     const trpc = getTRPCClient();
+
     let isCleaningUp = false;
 
     const onVoiceNewProducerSub = trpc.voice.onNewProducer.subscribe(
@@ -137,6 +140,31 @@ const useVoiceEvents = ({
       }
     });
 
+    const onVoiceRemoveExternalStreamSub =
+      trpc.voice.onRemoveExternalStream.subscribe(undefined, {
+        onData: ({ channelId, streamId }) => {
+          if (currentVoiceChannelId !== channelId || isCleaningUp) return;
+
+          logVoice('External stream removed event received', {
+            streamId,
+            channelId
+          });
+
+          try {
+            removeExternalStream(streamId);
+          } catch (error) {
+            logVoice('Error removing external stream', {
+              error,
+              streamId,
+              channelId
+            });
+          }
+        },
+        onError: (error) => {
+          logVoice('onVoiceRemoveExternalStream subscription error', { error });
+        }
+      });
+
     return () => {
       logVoice('Cleaning up voice events');
 
@@ -145,6 +173,7 @@ const useVoiceEvents = ({
       onVoiceNewProducerSub.unsubscribe();
       onVoiceProducerClosedSub.unsubscribe();
       onVoiceUserLeaveSub.unsubscribe();
+      onVoiceRemoveExternalStreamSub.unsubscribe();
     };
   }, [
     currentVoiceChannelId,
@@ -152,6 +181,7 @@ const useVoiceEvents = ({
     consume,
     removeRemoteUserStream,
     removeExternalStreamTrack,
+    removeExternalStream,
     clearRemoteUserStreamsForUser,
     rtpCapabilities
   ]);

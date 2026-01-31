@@ -135,3 +135,18 @@ export interface PluginContext {
 
 export interface UnloadPluginContext
   extends Pick<PluginContext, "log" | "debug" | "error"> {}
+
+// re-export mediasoup types for plugin usage
+export type {
+  AppData,
+  Producer,
+  Router,
+  Transport,
+  PlainTransport,
+  PlainTransportOptions,
+  ProducerOptions,
+  RtpCodecCapability,
+  RtpParameters,
+  RtpEncodingParameters,
+  MediaKind,
+} from "mediasoup/types";
