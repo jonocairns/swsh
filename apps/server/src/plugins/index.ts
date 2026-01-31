@@ -724,19 +724,27 @@ class PluginManager {
             });
 
             if (options.producers.audio) {
-              pubsub.publish(ServerEvents.VOICE_NEW_PRODUCER, {
-                channelId: options.channelId,
-                remoteId: streamId,
-                kind: StreamKind.EXTERNAL_AUDIO
-              });
+              pubsub.publishForChannel(
+                options.channelId,
+                ServerEvents.VOICE_NEW_PRODUCER,
+                {
+                  channelId: options.channelId,
+                  remoteId: streamId,
+                  kind: StreamKind.EXTERNAL_AUDIO
+                }
+              );
             }
 
             if (options.producers.video) {
-              pubsub.publish(ServerEvents.VOICE_NEW_PRODUCER, {
-                channelId: options.channelId,
-                remoteId: streamId,
-                kind: StreamKind.EXTERNAL_VIDEO
-              });
+              pubsub.publishForChannel(
+                options.channelId,
+                ServerEvents.VOICE_NEW_PRODUCER,
+                {
+                  channelId: options.channelId,
+                  remoteId: streamId,
+                  kind: StreamKind.EXTERNAL_VIDEO
+                }
+              );
             }
 
             this.logPlugin(

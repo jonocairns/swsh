@@ -694,7 +694,7 @@ class VoiceRuntime {
             options.producers.audio
           );
 
-          pubsub.publish(ServerEvents.VOICE_NEW_PRODUCER, {
+          pubsub.publishForChannel(this.id, ServerEvents.VOICE_NEW_PRODUCER, {
             channelId: this.id,
             remoteId: streamId,
             kind: StreamKind.EXTERNAL_AUDIO
@@ -720,7 +720,7 @@ class VoiceRuntime {
             options.producers.video
           );
 
-          pubsub.publish(ServerEvents.VOICE_NEW_PRODUCER, {
+          pubsub.publishForChannel(this.id, ServerEvents.VOICE_NEW_PRODUCER, {
             channelId: this.id,
             remoteId: streamId,
             kind: StreamKind.EXTERNAL_VIDEO

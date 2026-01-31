@@ -109,6 +109,10 @@ class PubSub {
     number,
     Map<string, Set<(data: Events[keyof Events]) => void>>
   > = new Map();
+  private channelListeners: Map<
+    number,
+    Map<string, Set<(data: Events[keyof Events]) => void>>
+  > = new Map();
 
   constructor() {
     this.ee = new EventEmitter();
@@ -208,6 +212,73 @@ class PubSub {
 
           if (userTopics.size === 0) {
             this.userListeners.delete(userId);
+          }
+        }
+      };
+
+      return unsubscribable;
+    });
+  }
+
+  public publishForChannel<TTopic extends keyof Events>(
+    channelId: number,
+    topic: TTopic,
+    payload: Events[TTopic]
+  ): void {
+    const channelTopics = this.channelListeners.get(channelId);
+
+    if (!channelTopics) return;
+
+    const listeners = channelTopics.get(topic);
+
+    if (!listeners) return;
+
+    for (const listener of listeners) {
+      listener(payload);
+    }
+  }
+
+  public subscribeForChannel<TTopic extends keyof Events>(
+    channelId: number,
+    topic: TTopic
+  ): Observable<Events[TTopic], unknown> {
+    return observable((observer) => {
+      const listener = (data: Events[TTopic]) => {
+        observer.next(data);
+      };
+
+      if (!this.channelListeners.has(channelId)) {
+        this.channelListeners.set(channelId, new Map());
+      }
+
+      const channelTopics = this.channelListeners.get(channelId)!;
+
+      if (!channelTopics.has(topic)) {
+        channelTopics.set(topic, new Set());
+      }
+
+      channelTopics
+        .get(topic)!
+        .add(listener as (data: Events[keyof Events]) => void);
+
+      const unsubscribable: Unsubscribable = {
+        unsubscribe: () => {
+          const channelTopics = this.channelListeners.get(channelId);
+
+          if (!channelTopics) return;
+
+          const listeners = channelTopics.get(topic);
+
+          if (!listeners) return;
+
+          listeners.delete(listener as (data: Events[keyof Events]) => void);
+
+          if (listeners.size === 0) {
+            channelTopics.delete(topic);
+          }
+
+          if (channelTopics.size === 0) {
+            this.channelListeners.delete(channelId);
           }
         }
       };

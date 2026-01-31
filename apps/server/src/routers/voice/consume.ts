@@ -63,11 +63,15 @@ const consumeRoute = protectedProcedure
     consumer.on('producerclose', () => {
       if (!ctx.currentVoiceChannelId) return;
 
-      ctx.pubsub.publish(ServerEvents.VOICE_PRODUCER_CLOSED, {
-        channelId: ctx.currentVoiceChannelId,
-        remoteId: input.remoteId,
-        kind: input.kind
-      });
+      ctx.pubsub.publishForChannel(
+        ctx.currentVoiceChannelId,
+        ServerEvents.VOICE_PRODUCER_CLOSED,
+        {
+          channelId: ctx.currentVoiceChannelId,
+          remoteId: input.remoteId,
+          kind: input.kind
+        }
+      );
     });
 
     return {

@@ -65,11 +65,15 @@ const produceRoute = protectedProcedure
 
     runtime.addProducer(ctx.user.id, input.kind, producer);
 
-    ctx.pubsub.publish(ServerEvents.VOICE_NEW_PRODUCER, {
-      channelId: ctx.currentVoiceChannelId,
-      remoteId: ctx.user.id,
-      kind: input.kind
-    });
+    ctx.pubsub.publishForChannel(
+      ctx.currentVoiceChannelId,
+      ServerEvents.VOICE_NEW_PRODUCER,
+      {
+        channelId: ctx.currentVoiceChannelId,
+        remoteId: ctx.user.id,
+        kind: input.kind
+      }
+    );
 
     return producer.id;
   });
