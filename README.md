@@ -48,12 +48,23 @@ docker run \
   sharkord/sharkord:latest
 ```
 
-### Open the Client
+### Open The Client
 
 Once the server is running, open your web browser and navigate to [http://localhost:4991](http://localhost:4991) to access the Sharkord client interface. If you're running the server on a different machine, replace `localhost` with the server's IP address or domain name.
 
 > [!NOTE]
 > Upon first launch, Sharkord will create a secure token and print it to the console. This token allows ANYONE to gain owner access to your server, so make sure to store it securely and do not lose it!
+
+### Gain Owner Permissions
+
+1. Login into your server
+2. Open Dev Tools (`CTRL + Shift + I` or `Right Click > Inspect`)
+3. Open the console
+4. Type useToken('your_token_here')
+5. Press enter
+6. Your account will now have the owner role
+
+The way of using this token will be more user friendly in the future.
 
 ## Configuration
 
@@ -87,8 +98,8 @@ See the [Plugin SDK](packages/plugin-sdk/README.md) for more information on crea
 
 Example plugins:
 
-[Sharkord Music Bot](https://github.com/diogomartino/sharkord-music-bot) - A plugin that adds music playback capabilities to Sharkord voice channels using YouTube as a source.
-[Sharkord IPTV](https://github.com/diogomartino/sharkord-iptv) - A plugin that allows users to stream IPTV channels directly within Sharkord voice channels.
+- [Sharkord Music Bot](https://github.com/diogomartino/sharkord-music-bot) - A plugin that adds music playback capabilities to Sharkord voice channels using YouTube as a source.
+- [Sharkord IPTV](https://github.com/diogomartino/sharkord-iptv) - A plugin that allows users to stream IPTV channels directly within Sharkord voice channels.
 
 ## Contributing
 
