@@ -9,7 +9,7 @@ let webRtcServer: mediasoup.types.WebRtcServer<mediasoup.types.AppData>;
 let webRtcServerListenInfo: { ip: string; announcedAddress?: string };
 
 const loadMediasoup = async () => {
-  const port = +config.mediasoup.webrtcPort;
+  const port = +config.webRtc.port;
 
   const workerConfig: mediasoup.types.WorkerSettings = {
     logLevel: 'debug',
@@ -32,8 +32,7 @@ const loadMediasoup = async () => {
   logger.debug('Mediasoup worker loaded');
 
   if (IS_PRODUCTION) {
-    const announcedAddress =
-      config.mediasoup.announcedAddress || SERVER_PUBLIC_IP;
+    const announcedAddress = config.webRtc.announcedAddress || SERVER_PUBLIC_IP;
 
     webRtcServer = await mediaSoupWorker.createWebRtcServer({
       listenInfos: [

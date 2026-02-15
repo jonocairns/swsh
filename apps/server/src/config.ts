@@ -20,8 +20,8 @@ const zConfig = z.object({
     debug: z.coerce.boolean(),
     autoupdate: z.coerce.boolean()
   }),
-  mediasoup: z.object({
-    webrtcPort: z.coerce.number().int().positive(),
+  webRtc: z.object({
+    port: z.coerce.number().int().positive(),
     announcedAddress: z.string()
   }),
   rateLimiters: z.object({
@@ -48,8 +48,8 @@ const defaultConfig: TConfig = {
     debug: IS_DEVELOPMENT,
     autoupdate: false
   },
-  mediasoup: {
-    webrtcPort: 40000,
+  webRtc: {
+    port: 40000,
     announcedAddress: ''
   },
   rateLimiters: {
