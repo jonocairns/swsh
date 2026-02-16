@@ -16,6 +16,11 @@ import {
   setSessionStorageItem
 } from '@/helpers/storage';
 import { useForm } from '@/hooks/use-form';
+import {
+  getRuntimeServerConfig,
+  normalizeServerUrl,
+  updateDesktopServerUrl
+} from '@/runtime/server-config';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -33,6 +38,10 @@ const Connect = memo(() => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [savingServerUrl, setSavingServerUrl] = useState(false);
+  const [desktopServerUrl, setDesktopServerUrl] = useState(
+    getRuntimeServerConfig().serverUrl
+  );
   const info = useInfo();
 
   const inviteCode = useMemo(() => {
@@ -104,6 +113,22 @@ const Connect = memo(() => {
     inviteCode
   ]);
 
+  const onSaveServerUrl = useCallback(async () => {
+    setSavingServerUrl(true);
+
+    try {
+      const normalized = normalizeServerUrl(desktopServerUrl);
+      await updateDesktopServerUrl(normalized.url);
+      window.location.reload();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not save server URL';
+
+      toast.error(message);
+      setSavingServerUrl(false);
+    }
+  }, [desktopServerUrl]);
+
   const logoSrc = useMemo(() => {
     if (info?.logo) {
       return getFileUrl(info.logo);
@@ -155,7 +180,39 @@ const Connect = memo(() => {
           </div>
 
           <div className="flex flex-col gap-2">
-            {!window.isSecureContext && (
+            {window.sharkordDesktop && (
+              <Group label="Desktop Server URL">
+                <div className="flex gap-2">
+                  <Input
+                    value={desktopServerUrl}
+                    onChange={(event) =>
+                      setDesktopServerUrl(event.target.value)
+                    }
+                    onEnter={onSaveServerUrl}
+                    placeholder="http://localhost:4991"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={onSaveServerUrl}
+                    disabled={!desktopServerUrl.trim() || savingServerUrl}
+                  >
+                    Save URL
+                  </Button>
+                </div>
+              </Group>
+            )}
+
+            {!info && (
+              <Alert variant="destructive">
+                <AlertTitle>Server Unavailable</AlertTitle>
+                <AlertDescription>
+                  Could not fetch server info from the configured host. Verify
+                  the server URL and try again.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {!window.sharkordDesktop && !window.isSecureContext && (
               <Alert variant="destructive">
                 <AlertTitle>Insecure Connection</AlertTitle>
                 <AlertDescription>

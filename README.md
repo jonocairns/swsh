@@ -79,6 +79,30 @@ Make sure you download Microsoft Visual C++ 2015 - 2022 Redistributable (x64) fr
 
 Once the server is running, open your web browser and navigate to [http://localhost:4991](http://localhost:4991) to access the Sharkord client interface. If you're running the server on a different machine, replace `localhost` with the server's IP address or domain name.
 
+### Desktop Developer Preview (Electron)
+
+This repository also includes an unsigned desktop preview client based on Electron.
+
+```bash
+# install workspace dependencies
+bun install
+
+# run desktop app in development (starts server + Vite + Electron)
+./electron.sh
+
+# build unsigned unpacked desktop artifacts
+cd apps/desktop
+bun run build
+```
+
+Preview behavior notes:
+
+- Windows: system audio and per-app audio modes are available.
+- macOS: screen video sharing works, but screen-share audio is currently unavailable in this preview.
+- Linux: screen-share audio modes are best-effort and depend on your compositor/PipeWire portal support.
+
+Troubleshooting details are available at [docs/desktop/troubleshooting.md](docs/desktop/troubleshooting.md).
+
 > [!NOTE]
 > Upon first launch, Sharkord will create a secure token and print it to the console. This token allows ANYONE to gain owner access to your server, so make sure to store it securely and do not lose it!
 

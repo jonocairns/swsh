@@ -4,34 +4,46 @@ import type { TConnectionInfo } from '../types';
 
 // TODO: this code is shit and needs to be improved later
 
+type TSocketLike = {
+  _socket?: { remoteAddress?: unknown };
+  socket?: { remoteAddress?: unknown };
+};
+
+const normalizeIpCandidate = (value: unknown): string | undefined => {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value[0];
+  if (value === null || value === undefined) return undefined;
+  return String(value);
+};
+
 const getWsIp = (
-  ws: any | undefined,
+  ws: unknown,
   req: http.IncomingMessage
 ): string | undefined => {
+  const parsedWs =
+    ws && typeof ws === 'object' ? (ws as TSocketLike) : undefined;
+
   const headers = req?.headers || {};
 
-  let ip =
+  let ip = normalizeIpCandidate(
     headers['cf-connecting-ip'] ||
-    headers['cf-real-ip'] ||
-    headers['x-real-ip'] ||
-    headers['x-forwarded-for'] ||
-    headers['x-client-ip'] ||
-    headers['x-cluster-client-ip'] ||
-    headers['forwarded-for'] ||
-    headers['forwarded'] ||
-    ws?._socket?.remoteAddress ||
-    ws?.socket?.remoteAddress ||
-    req?.socket?.remoteAddress ||
-    req?.connection?.remoteAddress;
+      headers['cf-real-ip'] ||
+      headers['x-real-ip'] ||
+      headers['x-forwarded-for'] ||
+      headers['x-client-ip'] ||
+      headers['x-cluster-client-ip'] ||
+      headers['forwarded-for'] ||
+      headers['forwarded'] ||
+      parsedWs?._socket?.remoteAddress ||
+      parsedWs?.socket?.remoteAddress ||
+      req?.socket?.remoteAddress ||
+      req?.connection?.remoteAddress
+  );
 
   if (!ip) return undefined;
 
-  if (typeof ip !== 'string') {
-    ip = String(ip);
-  }
-
   if (ip.includes(',')) {
-    ip = ip.split(',')[0].trim();
+    ip = ip.split(',')[0]?.trim() ?? ip;
   }
 
   if (ip.startsWith('::ffff:')) {
@@ -50,7 +62,7 @@ const getWsIp = (
 };
 
 const getWsInfo = (
-  ws: any | undefined,
+  ws: unknown,
   req: http.IncomingMessage
 ): TConnectionInfo | undefined => {
   const ip = getWsIp(ws, req);

@@ -26,16 +26,19 @@ export const fetchServerInfo = async (): Promise<TServerInfo | undefined> => {
 };
 
 export const loadApp = async () => {
-  const info = await fetchServerInfo();
+  try {
+    const info = await fetchServerInfo();
 
-  if (!info) {
-    console.error('Failed to load server info during app load');
-    toast.error('Failed to load server info');
-    return;
+    if (!info) {
+      console.error('Failed to load server info during app load');
+      toast.error('Failed to load server info');
+      return;
+    }
+
+    setInfo(info);
+  } finally {
+    setAppLoading(false);
   }
-
-  setInfo(info);
-  setAppLoading(false);
 };
 
 export const setModViewOpen = (isOpen: boolean, userId?: number) =>

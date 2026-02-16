@@ -1,4 +1,5 @@
 import type { StreamKind } from '@sharkord/shared';
+import { ScreenAudioMode } from './runtime/types';
 
 export type TDevices = {
   input: {
@@ -41,7 +42,7 @@ export type TDeviceSettings = {
   echoCancellation: boolean;
   noiseSuppression: boolean;
   autoGainControl: boolean;
-  shareSystemAudio: boolean;
+  screenAudioMode: ScreenAudioMode;
   mirrorOwnVideo: boolean;
   screenResolution: Resolution;
   screenFramerate: number;

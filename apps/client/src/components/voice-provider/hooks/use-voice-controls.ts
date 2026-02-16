@@ -5,6 +5,7 @@ import { updateOwnVoiceState } from '@/features/server/voice/actions';
 import { useOwnVoiceState } from '@/features/server/voice/hooks';
 import { getTrpcError } from '@/helpers/parse-trpc-errors';
 import { getTRPCClient } from '@/lib/trpc';
+import type { TDesktopScreenShareSelection } from '@/runtime/types';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 
@@ -15,8 +16,11 @@ type TUseVoiceControlsParams = {
   startWebcamStream: () => Promise<void>;
   stopWebcamStream: () => void;
 
-  startScreenShareStream: () => Promise<MediaStreamTrack>;
+  startScreenShareStream: (
+    selection?: TDesktopScreenShareSelection
+  ) => Promise<MediaStreamTrack>;
   stopScreenShareStream: () => void;
+  requestScreenShareSelection?: () => Promise<TDesktopScreenShareSelection | null>;
 };
 
 const useVoiceControls = ({
@@ -25,7 +29,8 @@ const useVoiceControls = ({
   startWebcamStream,
   stopWebcamStream,
   startScreenShareStream,
-  stopScreenShareStream
+  stopScreenShareStream,
+  requestScreenShareSelection
 }: TUseVoiceControlsParams) => {
   const ownVoiceState = useOwnVoiceState();
   const currentVoiceChannelId = useCurrentVoiceChannelId();
@@ -110,7 +115,7 @@ const useVoiceControls = ({
       await trpc.voice.updateState.mutate({
         webcamEnabled: newState
       });
-     } catch (error) {
+    } catch (error) {
       updateOwnVoiceState({ webcamEnabled: false });
 
       try {
@@ -129,8 +134,19 @@ const useVoiceControls = ({
   ]);
 
   const toggleScreenShare = useCallback(async () => {
+    if (!currentVoiceChannelId) return;
+
     const newState = !ownVoiceState.sharingScreen;
     const trpc = getTRPCClient();
+    let selection: TDesktopScreenShareSelection | null | undefined = undefined;
+
+    if (newState && requestScreenShareSelection) {
+      selection = await requestScreenShareSelection();
+
+      if (!selection) {
+        return;
+      }
+    }
 
     updateOwnVoiceState({ sharingScreen: newState });
 
@@ -142,8 +158,8 @@ const useVoiceControls = ({
 
     try {
       if (newState) {
-        const video = await startScreenShareStream();
-        
+        const video = await startScreenShareStream(selection || undefined);
+
         // handle native screen share end
         video.onended = async () => {
           stopScreenShareStream();
@@ -179,7 +195,8 @@ const useVoiceControls = ({
     ownVoiceState.sharingScreen,
     startScreenShareStream,
     stopScreenShareStream,
-    currentVoiceChannelId
+    currentVoiceChannelId,
+    requestScreenShareSelection
   ]);
 
   return {

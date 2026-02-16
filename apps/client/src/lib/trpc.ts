@@ -7,6 +7,7 @@ import {
   removeSessionStorageItem,
   SessionStorageKey
 } from '@/helpers/storage';
+import { getRuntimeServerConfig } from '@/runtime/server-config';
 import type { AppRouter, TConnectionParams } from '@sharkord/shared';
 import { createTRPCProxyClient, createWSClient, wsLink } from '@trpc/client';
 
@@ -15,7 +16,11 @@ let trpc: ReturnType<typeof createTRPCProxyClient<AppRouter>> | null = null;
 let currentHost: string | null = null;
 
 const initializeTRPC = (host: string) => {
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const runtimeServerUrl = getRuntimeServerConfig().serverUrl;
+  const serverProtocol = runtimeServerUrl
+    ? new URL(runtimeServerUrl).protocol
+    : window.location.protocol;
+  const protocol = serverProtocol === 'https:' ? 'wss' : 'ws';
 
   wsClient = createWSClient({
     url: `${protocol}://${host}`,

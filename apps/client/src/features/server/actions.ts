@@ -47,12 +47,7 @@ export const setInfo = (info: TServerInfo | undefined) => {
 export const connect = async () => {
   const state = store.getState();
   const info = infoSelector(state);
-
-  if (!info) {
-    throw new Error('Failed to fetch server info');
-  }
-
-  const { serverId } = info;
+  const serverId = info?.serverId ?? 'unknown-server';
 
   const host = getHostFromServer();
   const trpc = await connectToTRPC(host);

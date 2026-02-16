@@ -72,7 +72,10 @@ let config: TConfig = structuredClone(defaultConfig);
 
 await ensureServerDirs();
 
-const configExists = await fs.exists(CONFIG_INI_PATH);
+const configExists = await fs
+  .access(CONFIG_INI_PATH)
+  .then(() => true)
+  .catch(() => false);
 
 if (!configExists) {
   // config does not exist, create it with the default config

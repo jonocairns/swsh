@@ -7,6 +7,13 @@ import { TEST_SECRET_TOKEN } from '../../__tests__/seed';
 import { tdb } from '../../__tests__/setup';
 import { invites, roles, settings, userRoles, users } from '../../db/schema';
 
+type TLoginResponse = {
+  success?: boolean;
+  token: string;
+  error?: string;
+  errors: Record<string, string>;
+};
+
 describe('/login', () => {
   test('should successfully login with valid credentials', async () => {
     const response = await login('testowner', 'password123');
@@ -28,7 +35,7 @@ describe('/login', () => {
 
     expect(response.status).toBe(400);
 
-    const data: any = await response.json();
+    const data = (await response.json()) as TLoginResponse;
 
     expect(data).toHaveProperty('errors');
     expect(data.errors).toHaveProperty('password', 'Invalid password');
@@ -61,7 +68,7 @@ describe('/login', () => {
 
     expect(response.status).toBe(400);
 
-    const data: any = await response.json();
+    const data = (await response.json()) as TLoginResponse;
 
     expect(data).toHaveProperty('errors');
     expect(data.errors).toHaveProperty('identity', 'Invalid invite code');
@@ -117,7 +124,7 @@ describe('/login', () => {
 
     expect(response.status).toBe(400);
 
-    const data: any = await response.json();
+    const data = (await response.json()) as TLoginResponse;
 
     expect(data).toHaveProperty('errors');
     expect(data.errors).toHaveProperty('identity');
@@ -144,7 +151,7 @@ describe('/login', () => {
 
     expect(response.status).toBe(400);
 
-    const data: any = await response.json();
+    const data = (await response.json()) as TLoginResponse;
 
     expect(data).toHaveProperty('errors');
     expect(data.errors).toHaveProperty('identity');
@@ -161,7 +168,7 @@ describe('/login', () => {
 
     expect(response.status).toBe(400);
 
-    const data: any = await response.json();
+    const data = (await response.json()) as TLoginResponse;
 
     expect(data).toHaveProperty('errors');
     expect(data.errors).toHaveProperty('identity');
@@ -180,7 +187,7 @@ describe('/login', () => {
 
     expect(response.status).toBe(400);
 
-    const data: any = await response.json();
+    const data = (await response.json()) as TLoginResponse;
 
     expect(data).toHaveProperty('errors');
     expect(data.errors).toHaveProperty('identity');
@@ -212,7 +219,7 @@ describe('/login', () => {
 
     expect(response.status).toBe(200);
 
-    const data: any = await response.json();
+    const data = (await response.json()) as TLoginResponse;
 
     const decoded = jwt.verify(
       data.token,
