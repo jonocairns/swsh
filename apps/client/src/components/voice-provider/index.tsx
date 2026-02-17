@@ -36,7 +36,6 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { useDevices } from '../devices-provider/hooks/use-devices';
-import { matchesPushKeybind } from '../devices-provider/push-keybind';
 import {
   createDesktopAppAudioPipeline,
   type TDesktopAppAudioPipeline
@@ -100,26 +99,6 @@ const resolvePreferredVideoCodec = (
   return (rtpCapabilities.codecs ?? []).find((codec) => {
     return codec.mimeType.toLowerCase() === preferredMimeType;
   });
-};
-
-const isEditableTarget = (target: EventTarget | null): boolean => {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  const tagName = target.tagName.toLowerCase();
-
-  return (
-    target.isContentEditable || tagName === 'input' || tagName === 'textarea'
-  );
-};
-
-const isPushKeybindCaptureTarget = (target: EventTarget | null): boolean => {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  return Boolean(target.closest('[data-push-keybind-capture="true"]'));
 };
 
 export type TVoiceProvider = {
@@ -1203,140 +1182,6 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
       applyPushMicOverride();
     }
   }, [applyPushMicOverride, channelCan, currentVoiceChannelId]);
-
-  useEffect(() => {
-    const isDesktopRuntime =
-      typeof window !== 'undefined' && Boolean(window.sharkordDesktop);
-    const hasPushKeybinds = Boolean(
-      devices.pushToTalkKeybind || devices.pushToMuteKeybind
-    );
-
-    if (!isDesktopRuntime || !hasPushKeybinds) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      const isPushToTalkKey = matchesPushKeybind(
-        {
-          code: event.code,
-          ctrlKey: event.ctrlKey,
-          altKey: event.altKey,
-          shiftKey: event.shiftKey,
-          metaKey: event.metaKey
-        },
-        devices.pushToTalkKeybind
-      );
-      const isPushToMuteKey = matchesPushKeybind(
-        {
-          code: event.code,
-          ctrlKey: event.ctrlKey,
-          altKey: event.altKey,
-          shiftKey: event.shiftKey,
-          metaKey: event.metaKey
-        },
-        devices.pushToMuteKeybind
-      );
-
-      if (!isPushToTalkKey && !isPushToMuteKey) {
-        return;
-      }
-
-      if (
-        isEditableTarget(event.target) ||
-        isPushKeybindCaptureTarget(event.target) ||
-        currentVoiceChannelIdRef.current === undefined ||
-        !canSpeakRef.current
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      if (event.repeat) {
-        return;
-      }
-
-      if (
-        !isPushToTalkHeldRef.current &&
-        !isPushToMuteHeldRef.current &&
-        micMutedBeforePushRef.current === undefined
-      ) {
-        micMutedBeforePushRef.current = ownMicMutedRef.current;
-      }
-
-      if (isPushToTalkKey) {
-        isPushToTalkHeldRef.current = true;
-      }
-
-      if (isPushToMuteKey) {
-        isPushToMuteHeldRef.current = true;
-      }
-
-      applyPushMicOverride();
-    };
-
-    const onKeyUp = (event: KeyboardEvent) => {
-      const isPushToTalkKey = matchesPushKeybind(
-        {
-          code: event.code,
-          ctrlKey: event.ctrlKey,
-          altKey: event.altKey,
-          shiftKey: event.shiftKey,
-          metaKey: event.metaKey
-        },
-        devices.pushToTalkKeybind
-      );
-      const isPushToMuteKey = matchesPushKeybind(
-        {
-          code: event.code,
-          ctrlKey: event.ctrlKey,
-          altKey: event.altKey,
-          shiftKey: event.shiftKey,
-          metaKey: event.metaKey
-        },
-        devices.pushToMuteKeybind
-      );
-
-      if (!isPushToTalkKey && !isPushToMuteKey) {
-        return;
-      }
-
-      if (isPushToTalkKey) {
-        isPushToTalkHeldRef.current = false;
-      }
-
-      if (isPushToMuteKey) {
-        isPushToMuteHeldRef.current = false;
-      }
-
-      applyPushMicOverride();
-    };
-
-    const onWindowBlur = () => {
-      isPushToTalkHeldRef.current = false;
-      isPushToMuteHeldRef.current = false;
-      applyPushMicOverride();
-    };
-
-    window.addEventListener('keydown', onKeyDown, true);
-    window.addEventListener('keyup', onKeyUp, true);
-    window.addEventListener('blur', onWindowBlur);
-
-    return () => {
-      window.removeEventListener('keydown', onKeyDown, true);
-      window.removeEventListener('keyup', onKeyUp, true);
-      window.removeEventListener('blur', onWindowBlur);
-
-      isPushToTalkHeldRef.current = false;
-      isPushToMuteHeldRef.current = false;
-      applyPushMicOverride();
-    };
-  }, [
-    applyPushMicOverride,
-    devices.pushToMuteKeybind,
-    devices.pushToTalkKeybind
-  ]);
 
   useVoiceEvents({
     consume,

@@ -49,6 +49,8 @@ use windows::Win32::System::Threading::{
 #[cfg(windows)]
 use windows::Win32::System::Variant::VT_BLOB;
 #[cfg(windows)]
+use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+#[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindow, GetWindowLongW, GetWindowTextLengthW, GetWindowTextW,
     GetWindowThreadProcessId, IsWindow, IsWindowVisible, GWL_EXSTYLE, GW_OWNER, WS_EX_TOOLWINDOW,
@@ -124,6 +126,13 @@ struct StartAudioCaptureParams {
 #[serde(rename_all = "camelCase")]
 struct StopAudioCaptureParams {
     session_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SetPushKeybindsParams {
+    push_to_talk_keybind: Option<String>,
+    push_to_mute_keybind: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -210,6 +219,37 @@ struct CaptureSession {
     handle: JoinHandle<()>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PushKeybindKind {
+    Talk,
+    Mute,
+}
+
+impl PushKeybindKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Talk => "talk",
+            Self::Mute => "mute",
+        }
+    }
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct WindowsPushKeybind {
+    key_code: i32,
+    ctrl: bool,
+    alt: bool,
+    shift: bool,
+    meta: bool,
+}
+
+#[derive(Debug)]
+struct PushKeybindWatcher {
+    stop_flag: Arc<AtomicBool>,
+    handle: JoinHandle<()>,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct VoiceFilterConfig {
     post_filter_beta: f32,
@@ -241,6 +281,7 @@ struct VoiceFilterSession {
 struct SidecarState {
     capture_session: Option<CaptureSession>,
     voice_filter_session: Option<VoiceFilterSession>,
+    push_keybind_watcher: Option<PushKeybindWatcher>,
 }
 
 #[derive(Default)]
@@ -473,6 +514,20 @@ fn enqueue_voice_filter_ended_event(
     }
 }
 
+fn enqueue_push_keybind_state_event(queue: &Arc<FrameQueue>, kind: PushKeybindKind, active: bool) {
+    let params = json!({
+        "kind": kind.as_str(),
+        "active": active,
+    });
+
+    if let Ok(serialized) = serde_json::to_string(&SidecarEvent {
+        event: "push_keybind.state",
+        params,
+    }) {
+        queue.push_line(serialized);
+    }
+}
+
 fn voice_filter_config(strength: VoiceFilterStrength) -> VoiceFilterConfig {
     match strength {
         VoiceFilterStrength::Low => VoiceFilterConfig {
@@ -663,6 +718,221 @@ fn voice_filter_frames_per_buffer(session: &VoiceFilterSession) -> usize {
     match &session.processor {
         VoiceFilterProcessor::DeepFilter(processor) => processor.hop_size,
     }
+}
+
+#[cfg(windows)]
+const VK_LSHIFT: i32 = 0xA0;
+#[cfg(windows)]
+const VK_RSHIFT: i32 = 0xA1;
+#[cfg(windows)]
+const VK_LCONTROL: i32 = 0xA2;
+#[cfg(windows)]
+const VK_RCONTROL: i32 = 0xA3;
+#[cfg(windows)]
+const VK_LMENU: i32 = 0xA4;
+#[cfg(windows)]
+const VK_RMENU: i32 = 0xA5;
+#[cfg(windows)]
+const VK_LWIN: i32 = 0x5B;
+#[cfg(windows)]
+const VK_RWIN: i32 = 0x5C;
+
+#[cfg(windows)]
+fn map_key_code_to_virtual_key(key_code: &str) -> Option<i32> {
+    if key_code.starts_with("Key") && key_code.len() == 4 {
+        let key = key_code.chars().nth(3)?;
+        if key.is_ascii_alphabetic() {
+            return Some(key.to_ascii_uppercase() as i32);
+        }
+    }
+
+    if key_code.starts_with("Digit") && key_code.len() == 6 {
+        let key = key_code.chars().nth(5)?;
+        if key.is_ascii_digit() {
+            return Some(key as i32);
+        }
+    }
+
+    if let Some(function_key) = key_code.strip_prefix('F') {
+        if let Ok(function_number) = function_key.parse::<i32>() {
+            if (1..=24).contains(&function_number) {
+                return Some(0x6F + function_number);
+            }
+        }
+    }
+
+    if let Some(numpad_key) = key_code.strip_prefix("Numpad") {
+        if numpad_key.len() == 1 {
+            let key = numpad_key.chars().next()?;
+            if key.is_ascii_digit() {
+                return Some(0x60 + (key as i32 - '0' as i32));
+            }
+        }
+    }
+
+    match key_code {
+        "Space" => Some(0x20),
+        "Enter" => Some(0x0D),
+        "Escape" => Some(0x1B),
+        "Backspace" => Some(0x08),
+        "Tab" => Some(0x09),
+        "CapsLock" => Some(0x14),
+        "NumLock" => Some(0x90),
+        "ScrollLock" => Some(0x91),
+        "ArrowUp" => Some(0x26),
+        "ArrowDown" => Some(0x28),
+        "ArrowLeft" => Some(0x25),
+        "ArrowRight" => Some(0x27),
+        "Delete" => Some(0x2E),
+        "Insert" => Some(0x2D),
+        "Home" => Some(0x24),
+        "End" => Some(0x23),
+        "PageUp" => Some(0x21),
+        "PageDown" => Some(0x22),
+        "Minus" => Some(0xBD),
+        "Equal" => Some(0xBB),
+        "BracketLeft" => Some(0xDB),
+        "BracketRight" => Some(0xDD),
+        "Backslash" => Some(0xDC),
+        "Semicolon" => Some(0xBA),
+        "Quote" => Some(0xDE),
+        "Comma" => Some(0xBC),
+        "Period" => Some(0xBE),
+        "Slash" => Some(0xBF),
+        "Backquote" => Some(0xC0),
+        "NumpadMultiply" => Some(0x6A),
+        "NumpadAdd" => Some(0x6B),
+        "NumpadSubtract" => Some(0x6D),
+        "NumpadDecimal" => Some(0x6E),
+        "NumpadDivide" => Some(0x6F),
+        "NumpadEnter" => Some(0x0D),
+        _ => None,
+    }
+}
+
+#[cfg(windows)]
+fn parse_push_keybind(keybind: Option<&str>) -> Result<Option<WindowsPushKeybind>, String> {
+    let Some(keybind) = keybind else {
+        return Ok(None);
+    };
+
+    if keybind.trim().is_empty() {
+        return Ok(None);
+    }
+
+    let tokens: Vec<&str> = keybind
+        .split('+')
+        .map(|token| token.trim())
+        .filter(|token| !token.is_empty())
+        .collect();
+
+    if tokens.is_empty() {
+        return Ok(None);
+    }
+
+    let mut ctrl = false;
+    let mut alt = false;
+    let mut shift = false;
+    let mut meta = false;
+    let mut key_code_token: Option<&str> = None;
+
+    for token in tokens {
+        match token {
+            "Control" | "Ctrl" => {
+                ctrl = true;
+            }
+            "Alt" => {
+                alt = true;
+            }
+            "Shift" => {
+                shift = true;
+            }
+            "Meta" | "Command" => {
+                meta = true;
+            }
+            _ => {
+                if key_code_token.is_some() {
+                    return Err("Invalid keybind format.".to_string());
+                }
+
+                key_code_token = Some(token);
+            }
+        }
+    }
+
+    let key_code_name = key_code_token.ok_or_else(|| "Missing key code in keybind.".to_string())?;
+    let key_code = map_key_code_to_virtual_key(key_code_name)
+        .ok_or_else(|| "Unsupported key for global keybind monitoring.".to_string())?;
+
+    Ok(Some(WindowsPushKeybind {
+        key_code,
+        ctrl,
+        alt,
+        shift,
+        meta,
+    }))
+}
+
+#[cfg(windows)]
+fn is_virtual_key_down(key_code: i32) -> bool {
+    (unsafe { GetAsyncKeyState(key_code) } as u16 & 0x8000) != 0
+}
+
+#[cfg(windows)]
+fn current_modifiers_match(keybind: &WindowsPushKeybind) -> bool {
+    let ctrl = is_virtual_key_down(VK_LCONTROL) || is_virtual_key_down(VK_RCONTROL);
+    let alt = is_virtual_key_down(VK_LMENU) || is_virtual_key_down(VK_RMENU);
+    let shift = is_virtual_key_down(VK_LSHIFT) || is_virtual_key_down(VK_RSHIFT);
+    let meta = is_virtual_key_down(VK_LWIN) || is_virtual_key_down(VK_RWIN);
+
+    ctrl == keybind.ctrl && alt == keybind.alt && shift == keybind.shift && meta == keybind.meta
+}
+
+#[cfg(windows)]
+fn is_push_keybind_active(keybind: &WindowsPushKeybind) -> bool {
+    is_virtual_key_down(keybind.key_code) && current_modifiers_match(keybind)
+}
+
+#[cfg(windows)]
+fn start_push_keybind_watcher(
+    frame_queue: Arc<FrameQueue>,
+    talk_keybind: Option<WindowsPushKeybind>,
+    mute_keybind: Option<WindowsPushKeybind>,
+) -> PushKeybindWatcher {
+    let stop_flag = Arc::new(AtomicBool::new(false));
+    let thread_stop_flag = Arc::clone(&stop_flag);
+
+    let handle = thread::spawn(move || {
+        let mut talk_active = false;
+        let mut mute_active = false;
+
+        while !thread_stop_flag.load(Ordering::Relaxed) {
+            let next_talk_active = talk_keybind.as_ref().is_some_and(is_push_keybind_active);
+            let next_mute_active = mute_keybind.as_ref().is_some_and(is_push_keybind_active);
+
+            if next_talk_active != talk_active {
+                talk_active = next_talk_active;
+                enqueue_push_keybind_state_event(&frame_queue, PushKeybindKind::Talk, talk_active);
+            }
+
+            if next_mute_active != mute_active {
+                mute_active = next_mute_active;
+                enqueue_push_keybind_state_event(&frame_queue, PushKeybindKind::Mute, mute_active);
+            }
+
+            thread::sleep(Duration::from_millis(8));
+        }
+
+        if talk_active {
+            enqueue_push_keybind_state_event(&frame_queue, PushKeybindKind::Talk, false);
+        }
+
+        if mute_active {
+            enqueue_push_keybind_state_event(&frame_queue, PushKeybindKind::Mute, false);
+        }
+    });
+
+    PushKeybindWatcher { stop_flag, handle }
 }
 
 fn parse_target_pid(target_id: &str) -> Option<u32> {
@@ -1280,6 +1550,15 @@ fn stop_capture_session(state: &mut SidecarState, requested_session_id: Option<&
     state.capture_session = Some(active_session);
 }
 
+fn stop_push_keybind_watcher(state: &mut SidecarState) {
+    let Some(active_watcher) = state.push_keybind_watcher.take() else {
+        return;
+    };
+
+    active_watcher.stop_flag.store(true, Ordering::Relaxed);
+    let _ = active_watcher.handle.join();
+}
+
 fn stop_voice_filter_session(
     state: &mut SidecarState,
     frame_queue: &Arc<FrameQueue>,
@@ -1386,6 +1665,80 @@ fn handle_audio_capture_stop(state: &mut SidecarState, params: Value) -> Result<
         "stopped": true,
         "protocolVersion": PROTOCOL_VERSION,
     }))
+}
+
+fn handle_push_keybinds_set(
+    frame_queue: Arc<FrameQueue>,
+    state: &mut SidecarState,
+    params: Value,
+) -> Result<Value, String> {
+    let parsed: SetPushKeybindsParams =
+        serde_json::from_value(params).map_err(|error| format!("invalid params: {error}"))?;
+
+    stop_push_keybind_watcher(state);
+
+    #[cfg(not(windows))]
+    let _ = &frame_queue;
+
+    #[cfg(windows)]
+    {
+        let mut errors: Vec<String> = Vec::new();
+
+        let talk_keybind = match parse_push_keybind(parsed.push_to_talk_keybind.as_deref()) {
+            Ok(parsed_keybind) => parsed_keybind,
+            Err(error) => {
+                errors.push(format!("Push-to-talk keybind is invalid: {error}"));
+                None
+            }
+        };
+
+        let mut mute_keybind = match parse_push_keybind(parsed.push_to_mute_keybind.as_deref()) {
+            Ok(parsed_keybind) => parsed_keybind,
+            Err(error) => {
+                errors.push(format!("Push-to-mute keybind is invalid: {error}"));
+                None
+            }
+        };
+
+        if talk_keybind.is_some() && mute_keybind.is_some() && talk_keybind == mute_keybind {
+            mute_keybind = None;
+            errors.push("Push-to-mute keybind matches push-to-talk and was ignored.".to_string());
+        }
+
+        if talk_keybind.is_some() || mute_keybind.is_some() {
+            state.push_keybind_watcher = Some(start_push_keybind_watcher(
+                frame_queue,
+                talk_keybind,
+                mute_keybind,
+            ));
+        }
+
+        let talk_registered = talk_keybind.is_some();
+        let mute_registered = mute_keybind.is_some();
+
+        return Ok(json!({
+            "talkRegistered": talk_registered,
+            "muteRegistered": mute_registered,
+            "errors": errors,
+        }));
+    }
+
+    #[cfg(not(windows))]
+    {
+        let mut errors = Vec::new();
+        if parsed.push_to_talk_keybind.is_some() || parsed.push_to_mute_keybind.is_some() {
+            errors.push(
+                "Global push keybind monitoring via sidecar is only available on Windows."
+                    .to_string(),
+            );
+        }
+
+        Ok(json!({
+            "talkRegistered": false,
+            "muteRegistered": false,
+            "errors": errors,
+        }))
+    }
 }
 
 fn handle_voice_filter_start(
@@ -1558,6 +1911,9 @@ fn main() {
                 request.params,
             ),
             "audio_capture.stop" => handle_audio_capture_stop(&mut state, request.params),
+            "push_keybinds.set" => {
+                handle_push_keybinds_set(request_frame_queue.clone(), &mut state, request.params)
+            }
             "voice_filter.start" => {
                 handle_voice_filter_start(request_frame_queue.clone(), &mut state, request.params)
             }
@@ -1583,6 +1939,7 @@ fn main() {
     }
 
     stop_capture_session(&mut state, None);
+    stop_push_keybind_watcher(&mut state);
     stop_voice_filter_session(&mut state, &frame_queue, None, "capture_stopped", None);
     frame_queue.close();
     let _ = frame_writer.join();

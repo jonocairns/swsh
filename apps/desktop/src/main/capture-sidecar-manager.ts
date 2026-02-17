@@ -7,6 +7,9 @@ import type {
   TAppAudioSession,
   TAppAudioStatusEvent,
   TDesktopAppAudioTargetsResult,
+  TDesktopPushKeybindEvent,
+  TDesktopPushKeybindsInput,
+  TGlobalPushKeybindRegistrationResult,
   TStartAppAudioCaptureInput,
   TStartVoiceFilterInput,
   TVoiceFilterFrame,
@@ -96,6 +99,10 @@ class CaptureSidecarManager {
   private pendingRequests = new Map<string, TPendingRequest>();
   private activeSessionId: string | undefined;
   private activeVoiceFilterSessionId: string | undefined;
+  private pushKeybindActiveState: Record<"talk" | "mute", boolean> = {
+    talk: false,
+    mute: false,
+  };
   private shuttingDown = false;
   private restartTimer: NodeJS.Timeout | undefined;
   private lastKnownError: string | undefined;
@@ -137,6 +144,13 @@ class CaptureSidecarManager {
     this.events.on("voice-filter-status", listener);
     return () => {
       this.events.off("voice-filter-status", listener);
+    };
+  }
+
+  onPushKeybind(listener: (event: TDesktopPushKeybindEvent) => void) {
+    this.events.on("push-keybind", listener);
+    return () => {
+      this.events.off("push-keybind", listener);
     };
   }
 
@@ -232,6 +246,14 @@ class CaptureSidecarManager {
     void this.sendNotification("voice_filter.push_frame", frame).catch((error) => {
       console.warn("[desktop] Failed to push voice filter frame", error);
     });
+  }
+
+  async setPushKeybinds(
+    input: TDesktopPushKeybindsInput,
+  ): Promise<TGlobalPushKeybindRegistrationResult> {
+    const response = await this.sendRequest("push_keybinds.set", input);
+
+    return response as TGlobalPushKeybindRegistrationResult;
   }
 
   async dispose() {
@@ -433,6 +455,18 @@ class CaptureSidecarManager {
       this.activeVoiceFilterSessionId = undefined;
     }
 
+    (["talk", "mute"] as const).forEach((kind) => {
+      if (!this.pushKeybindActiveState[kind]) {
+        return;
+      }
+
+      this.pushKeybindActiveState[kind] = false;
+      this.events.emit("push-keybind", {
+        kind,
+        active: false,
+      } satisfies TDesktopPushKeybindEvent);
+    });
+
     if (!this.shuttingDown) {
       this.scheduleRestart();
     }
@@ -498,6 +532,13 @@ class CaptureSidecarManager {
         }
 
         this.events.emit("voice-filter-status", statusEvent);
+        return;
+      }
+
+      if (parsedLine.event === "push_keybind.state") {
+        const pushEvent = parsedLine.params as TDesktopPushKeybindEvent;
+        this.pushKeybindActiveState[pushEvent.kind] = pushEvent.active;
+        this.events.emit("push-keybind", pushEvent);
       }
     }
   }

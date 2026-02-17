@@ -150,8 +150,6 @@ export type TDesktopPushKeybindEvent = {
 export type TGlobalPushKeybindRegistrationResult = {
   talkRegistered: boolean;
   muteRegistered: boolean;
-  talkAccelerator?: string;
-  muteAccelerator?: string;
   errors: string[];
 };
 
