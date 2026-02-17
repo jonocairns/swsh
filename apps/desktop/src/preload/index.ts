@@ -6,6 +6,10 @@ import type {
   TDesktopAppAudioTargetsResult,
   TScreenShareSelection,
   TStartAppAudioCaptureInput,
+  TStartVoiceFilterInput,
+  TVoiceFilterFrame,
+  TVoiceFilterSession,
+  TVoiceFilterStatusEvent,
 } from "../main/types";
 
 const desktopBridge = {
@@ -23,6 +27,15 @@ const desktopBridge = {
     ipcRenderer.invoke("desktop:start-app-audio-capture", input),
   stopAppAudioCapture: (sessionId?: string): Promise<void> =>
     ipcRenderer.invoke("desktop:stop-app-audio-capture", sessionId),
+  startVoiceFilterSession: (
+    input: TStartVoiceFilterInput,
+  ): Promise<TVoiceFilterSession> =>
+    ipcRenderer.invoke("desktop:start-voice-filter-session", input),
+  stopVoiceFilterSession: (sessionId?: string): Promise<void> =>
+    ipcRenderer.invoke("desktop:stop-voice-filter-session", sessionId),
+  pushVoiceFilterFrame: (frame: TVoiceFilterFrame): void => {
+    ipcRenderer.send("desktop:push-voice-filter-frame", frame);
+  },
   subscribeAppAudioFrames: (callback: (frame: TAppAudioFrame) => void) => {
     const listener = (_event: unknown, frame: TAppAudioFrame) => {
       callback(frame);
@@ -45,6 +58,30 @@ const desktopBridge = {
 
     return () => {
       ipcRenderer.removeListener("desktop:app-audio-status", listener);
+    };
+  },
+  subscribeVoiceFilterFrames: (callback: (frame: TVoiceFilterFrame) => void) => {
+    const listener = (_event: unknown, frame: TVoiceFilterFrame) => {
+      callback(frame);
+    };
+
+    ipcRenderer.on("desktop:voice-filter-frame", listener);
+
+    return () => {
+      ipcRenderer.removeListener("desktop:voice-filter-frame", listener);
+    };
+  },
+  subscribeVoiceFilterStatus: (
+    callback: (statusEvent: TVoiceFilterStatusEvent) => void,
+  ) => {
+    const listener = (_event: unknown, statusEvent: TVoiceFilterStatusEvent) => {
+      callback(statusEvent);
+    };
+
+    ipcRenderer.on("desktop:voice-filter-status", listener);
+
+    return () => {
+      ipcRenderer.removeListener("desktop:voice-filter-status", listener);
     };
   },
   prepareScreenShare: (selection: TScreenShareSelection) =>

@@ -1,5 +1,10 @@
 import { ScreenAudioMode } from '@/runtime/types';
-import { Resolution, type TDeviceSettings, VideoCodecPreference } from '@/types';
+import {
+  Resolution,
+  type TDeviceSettings,
+  VideoCodecPreference,
+  VoiceFilterStrength
+} from '@/types';
 
 type TLegacyDeviceSettings = Partial<TDeviceSettings> & {
   shareSystemAudio?: boolean;
@@ -13,6 +18,8 @@ const DEFAULT_DEVICE_SETTINGS: TDeviceSettings = {
   echoCancellation: false,
   noiseSuppression: false,
   autoGainControl: true,
+  experimentalVoiceFilter: false,
+  voiceFilterStrength: VoiceFilterStrength.BALANCED,
   screenAudioMode: ScreenAudioMode.SYSTEM,
   experimentalRustCapture: false,
   mirrorOwnVideo: false,
@@ -48,6 +55,15 @@ const migrateDeviceSettings = (
     )
       ? (incomingSettings.videoCodec as VideoCodecPreference)
       : VideoCodecPreference.AUTO,
+    experimentalVoiceFilter:
+      typeof incomingSettings.experimentalVoiceFilter === 'boolean'
+        ? incomingSettings.experimentalVoiceFilter
+        : DEFAULT_DEVICE_SETTINGS.experimentalVoiceFilter,
+    voiceFilterStrength: Object.values(VoiceFilterStrength).includes(
+      incomingSettings.voiceFilterStrength as VoiceFilterStrength
+    )
+      ? (incomingSettings.voiceFilterStrength as VoiceFilterStrength)
+      : DEFAULT_DEVICE_SETTINGS.voiceFilterStrength,
     experimentalRustCapture:
       typeof incomingSettings.experimentalRustCapture === 'boolean'
         ? incomingSettings.experimentalRustCapture

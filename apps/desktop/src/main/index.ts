@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  type IpcMainEvent,
   type IpcMainInvokeEvent,
   ipcMain,
   session,
@@ -20,7 +21,12 @@ import {
   prepareScreenShareSelection,
 } from "./screen-share";
 import { getServerUrl, setServerUrl } from "./settings-store";
-import type { TScreenShareSelection, TStartAppAudioCaptureInput } from "./types";
+import type {
+  TScreenShareSelection,
+  TStartAppAudioCaptureInput,
+  TStartVoiceFilterInput,
+  TVoiceFilterFrame,
+} from "./types";
 
 const RENDERER_URL = process.env.ELECTRON_RENDERER_URL;
 let mainWindow: BrowserWindow | null = null;
@@ -172,6 +178,27 @@ const registerIpcHandlers = () => {
     },
   );
 
+  ipcMain.handle(
+    "desktop:start-voice-filter-session",
+    (_event, input: TStartVoiceFilterInput) => {
+      return captureSidecarManager.startVoiceFilterSession(input);
+    },
+  );
+
+  ipcMain.handle(
+    "desktop:stop-voice-filter-session",
+    (_event, sessionId?: string) => {
+      return captureSidecarManager.stopVoiceFilterSession(sessionId);
+    },
+  );
+
+  ipcMain.on(
+    "desktop:push-voice-filter-frame",
+    (_event: IpcMainEvent, frame: TVoiceFilterFrame) => {
+      captureSidecarManager.pushVoiceFilterFrame(frame);
+    },
+  );
+
   ipcMain.handle("desktop:ping-sidecar", () => {
     return captureSidecarManager.getStatus();
   });
@@ -228,6 +255,12 @@ void app
     });
     captureSidecarManager.onStatus((event) => {
       mainWindow?.webContents.send("desktop:app-audio-status", event);
+    });
+    captureSidecarManager.onVoiceFilterFrame((frame) => {
+      mainWindow?.webContents.send("desktop:voice-filter-frame", frame);
+    });
+    captureSidecarManager.onVoiceFilterStatus((event) => {
+      mainWindow?.webContents.send("desktop:voice-filter-status", event);
     });
 
     registerIpcHandlers();

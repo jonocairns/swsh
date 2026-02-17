@@ -96,3 +96,43 @@ export type TAppAudioStatusEvent = {
   error?: string;
   protocolVersion?: number;
 };
+
+export type TVoiceFilterStrength =
+  | "low"
+  | "balanced"
+  | "high"
+  | "aggressive";
+
+export type TVoiceFilterSession = {
+  sessionId: string;
+  sampleRate: number;
+  channels: number;
+  framesPerBuffer: number;
+  protocolVersion?: number;
+  encoding?: "f32le_base64";
+};
+
+export type TVoiceFilterFrame = {
+  sessionId: string;
+  sequence: number;
+  sampleRate: number;
+  channels: number;
+  frameCount: number;
+  pcmBase64: string;
+  protocolVersion: number;
+  encoding: "f32le_base64";
+  droppedFrameCount?: number;
+};
+
+export type TVoiceFilterStatusEvent = {
+  sessionId: string;
+  reason: "capture_stopped" | "capture_error" | "sidecar_exited";
+  error?: string;
+  protocolVersion?: number;
+};
+
+export type TStartVoiceFilterInput = {
+  sampleRate: number;
+  channels: number;
+  suppressionLevel: TVoiceFilterStrength;
+};

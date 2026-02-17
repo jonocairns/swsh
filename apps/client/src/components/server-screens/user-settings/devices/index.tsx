@@ -29,7 +29,7 @@ import {
   updateDesktopServerUrl
 } from '@/runtime/server-config';
 import { ScreenAudioMode } from '@/runtime/types';
-import { Resolution, VideoCodecPreference } from '@/types';
+import { Resolution, VideoCodecPreference, VoiceFilterStrength } from '@/types';
 import { Info } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { toast } from 'sonner';
@@ -39,6 +39,8 @@ import ResolutionFpsControl from './resolution-fps-control';
 const DEFAULT_NAME = 'default';
 
 const Devices = memo(() => {
+  const hasDesktopBridge =
+    typeof window !== 'undefined' && Boolean(window.sharkordDesktop);
   const currentVoiceChannelId = useCurrentVoiceChannelId();
   const {
     inputDevices,
@@ -145,7 +147,47 @@ const Devices = memo(() => {
                 }
               />
             </Group>
+
+            <Group label="DeepFilterNet filter (Desktop)">
+              <Switch
+                checked={!!values.experimentalVoiceFilter}
+                onCheckedChange={(checked) =>
+                  onChange('experimentalVoiceFilter', checked)
+                }
+                disabled={!hasDesktopBridge}
+              />
+            </Group>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Uses desktop sidecar DeepFilterNet suppression. Higher strength
+            reduces more background noise but may affect voice quality. This
+            filter is available in the desktop app.
+          </p>
+          <Group label="Voice filter strength">
+            <Select
+              onValueChange={(value) =>
+                onChange('voiceFilterStrength', value as VoiceFilterStrength)
+              }
+              value={values.voiceFilterStrength}
+              disabled={!hasDesktopBridge || !values.experimentalVoiceFilter}
+            >
+              <SelectTrigger className="w-[240px]">
+                <SelectValue placeholder="Select a filter preset" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={VoiceFilterStrength.LOW}>Low</SelectItem>
+                  <SelectItem value={VoiceFilterStrength.BALANCED}>
+                    Balanced
+                  </SelectItem>
+                  <SelectItem value={VoiceFilterStrength.HIGH}>High</SelectItem>
+                  <SelectItem value={VoiceFilterStrength.AGGRESSIVE}>
+                    Aggressive
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Group>
         </Group>
 
         <Group label="Webcam">

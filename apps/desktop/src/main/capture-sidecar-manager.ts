@@ -9,6 +9,10 @@ import type {
   TAppAudioStatusEvent,
   TDesktopAppAudioTargetsResult,
   TStartAppAudioCaptureInput,
+  TStartVoiceFilterInput,
+  TVoiceFilterFrame,
+  TVoiceFilterSession,
+  TVoiceFilterStatusEvent,
 } from "./types";
 
 type TSidecarResponse = {
@@ -69,6 +73,7 @@ class CaptureSidecarManager {
   private requestId = 0;
   private pendingRequests = new Map<string, TPendingRequest>();
   private activeSessionId: string | undefined;
+  private activeVoiceFilterSessionId: string | undefined;
   private shuttingDown = false;
   private restartTimer: NodeJS.Timeout | undefined;
   private lastKnownError: string | undefined;
@@ -96,6 +101,20 @@ class CaptureSidecarManager {
     this.events.on("status", listener);
     return () => {
       this.events.off("status", listener);
+    };
+  }
+
+  onVoiceFilterFrame(listener: (frame: TVoiceFilterFrame) => void) {
+    this.events.on("voice-filter-frame", listener);
+    return () => {
+      this.events.off("voice-filter-frame", listener);
+    };
+  }
+
+  onVoiceFilterStatus(listener: (event: TVoiceFilterStatusEvent) => void) {
+    this.events.on("voice-filter-status", listener);
+    return () => {
+      this.events.off("voice-filter-status", listener);
     };
   }
 
@@ -157,11 +176,48 @@ class CaptureSidecarManager {
     }
   }
 
+  async startVoiceFilterSession(
+    input: TStartVoiceFilterInput,
+  ): Promise<TVoiceFilterSession> {
+    const response = await this.sendRequest("voice_filter.start", input);
+    const session = response as TVoiceFilterSession;
+    this.activeVoiceFilterSessionId = session.sessionId;
+
+    return session;
+  }
+
+  async stopVoiceFilterSession(sessionId?: string): Promise<void> {
+    const targetSessionId = sessionId || this.activeVoiceFilterSessionId;
+
+    if (!targetSessionId) {
+      return;
+    }
+
+    try {
+      await this.sendRequest("voice_filter.stop", {
+        sessionId: targetSessionId,
+      });
+    } catch (error) {
+      console.warn("[desktop] Failed to stop voice filter session", error);
+    } finally {
+      if (!sessionId || sessionId === this.activeVoiceFilterSessionId) {
+        this.activeVoiceFilterSessionId = undefined;
+      }
+    }
+  }
+
+  pushVoiceFilterFrame(frame: TVoiceFilterFrame): void {
+    void this.sendNotification("voice_filter.push_frame", frame).catch((error) => {
+      console.warn("[desktop] Failed to push voice filter frame", error);
+    });
+  }
+
   async dispose() {
     this.shuttingDown = true;
     clearTimeout(this.restartTimer);
 
     await this.stopAppAudioCapture();
+    await this.stopVoiceFilterSession();
 
     if (this.sidecarProcess && !this.sidecarProcess.killed) {
       this.sidecarProcess.kill();
@@ -345,6 +401,15 @@ class CaptureSidecarManager {
       this.activeSessionId = undefined;
     }
 
+    if (this.activeVoiceFilterSessionId) {
+      this.events.emit("voice-filter-status", {
+        sessionId: this.activeVoiceFilterSessionId,
+        reason: "sidecar_exited",
+        protocolVersion: 1,
+      } satisfies TVoiceFilterStatusEvent);
+      this.activeVoiceFilterSessionId = undefined;
+    }
+
     if (!this.shuttingDown) {
       this.scheduleRestart();
     }
@@ -394,6 +459,22 @@ class CaptureSidecarManager {
         }
 
         this.events.emit("status", statusEvent);
+        return;
+      }
+
+      if (parsedLine.event === "voice_filter.frame") {
+        this.events.emit("voice-filter-frame", parsedLine.params as TVoiceFilterFrame);
+        return;
+      }
+
+      if (parsedLine.event === "voice_filter.ended") {
+        const statusEvent = parsedLine.params as TVoiceFilterStatusEvent;
+
+        if (statusEvent.sessionId === this.activeVoiceFilterSessionId) {
+          this.activeVoiceFilterSessionId = undefined;
+        }
+
+        this.events.emit("voice-filter-status", statusEvent);
       }
     }
   }
@@ -433,6 +514,23 @@ class CaptureSidecarManager {
   private async sendRequest(method: string, params: unknown) {
     await this.ensureSidecarReady();
     return this.sendRequestInternal(method, params);
+  }
+
+  private async sendNotification(method: string, params: unknown) {
+    await this.ensureSidecarReady();
+
+    const processRef = this.sidecarProcess;
+
+    if (!processRef || processRef.killed || !processRef.stdin.writable) {
+      throw new Error(this.lastKnownError || "Capture sidecar is not running.");
+    }
+
+    const payload = JSON.stringify({
+      method,
+      params,
+    });
+
+    processRef.stdin.write(`${payload}\n`);
   }
 }
 

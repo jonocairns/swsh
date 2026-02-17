@@ -1,5 +1,5 @@
 import { ScreenAudioMode } from '@/runtime/types';
-import { VideoCodecPreference } from '@/types';
+import { VideoCodecPreference, VoiceFilterStrength } from '@/types';
 import { describe, expect, it } from 'bun:test';
 import {
   DEFAULT_DEVICE_SETTINGS,
@@ -10,6 +10,10 @@ describe('migrateDeviceSettings', () => {
   it('returns defaults when no saved data exists', () => {
     expect(migrateDeviceSettings(undefined)).toEqual(DEFAULT_DEVICE_SETTINGS);
     expect(DEFAULT_DEVICE_SETTINGS.experimentalRustCapture).toBe(false);
+    expect(DEFAULT_DEVICE_SETTINGS.experimentalVoiceFilter).toBe(false);
+    expect(DEFAULT_DEVICE_SETTINGS.voiceFilterStrength).toBe(
+      VoiceFilterStrength.BALANCED
+    );
   });
 
   it('migrates legacy shareSystemAudio=true to system mode', () => {
@@ -43,6 +47,30 @@ describe('migrateDeviceSettings', () => {
     });
 
     expect(migrated.experimentalRustCapture).toBe(true);
+  });
+
+  it('preserves explicit experimentalVoiceFilter values', () => {
+    const migrated = migrateDeviceSettings({
+      experimentalVoiceFilter: true
+    });
+
+    expect(migrated.experimentalVoiceFilter).toBe(true);
+  });
+
+  it('preserves explicit voiceFilterStrength values', () => {
+    const migrated = migrateDeviceSettings({
+      voiceFilterStrength: VoiceFilterStrength.AGGRESSIVE
+    });
+
+    expect(migrated.voiceFilterStrength).toBe(VoiceFilterStrength.AGGRESSIVE);
+  });
+
+  it('falls back to balanced for invalid voiceFilterStrength values', () => {
+    const migrated = migrateDeviceSettings({
+      voiceFilterStrength: 'invalid' as VoiceFilterStrength
+    });
+
+    expect(migrated.voiceFilterStrength).toBe(VoiceFilterStrength.BALANCED);
   });
 
   it('defaults video codec to auto for legacy settings', () => {

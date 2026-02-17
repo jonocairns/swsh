@@ -35,6 +35,10 @@ import {
   type TDesktopAppAudioPipeline
 } from './desktop-app-audio';
 import { FloatingPinnedCard } from './floating-pinned-card';
+import {
+  createMicAudioProcessingPipeline,
+  type TMicAudioProcessingPipeline
+} from './mic-audio-processing';
 import { useLocalStreams } from './hooks/use-local-streams';
 import { useRemoteStreams } from './hooks/use-remote-streams';
 import {
@@ -185,6 +189,10 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
   const appAudioStartupTimeoutRef = useRef<
     number | ReturnType<typeof setTimeout> | undefined
   >(undefined);
+  const rawMicStreamRef = useRef<MediaStream | undefined>(undefined);
+  const micAudioPipelineRef = useRef<TMicAudioProcessingPipeline | undefined>(
+    undefined
+  );
   const standbyDisplayAudioTrackRef = useRef<MediaStreamTrack | undefined>(
     undefined
   );
@@ -258,9 +266,31 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     resetStats
   } = useTransportStats();
 
+  const cleanupMicAudioPipeline = useCallback(async () => {
+    const rawMicStream = rawMicStreamRef.current;
+    rawMicStreamRef.current = undefined;
+
+    rawMicStream?.getTracks().forEach((track) => {
+      track.stop();
+    });
+
+    const pipeline = micAudioPipelineRef.current;
+    micAudioPipelineRef.current = undefined;
+
+    if (pipeline) {
+      try {
+        await pipeline.destroy();
+      } catch (error) {
+        logVoice('Failed to clean up microphone processing pipeline', { error });
+      }
+    }
+  }, []);
+
   const startMicStream = useCallback(async () => {
     try {
       logVoice('Starting microphone stream');
+
+      await cleanupMicAudioPipeline();
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -278,17 +308,45 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
 
       logVoice('Microphone stream obtained', { stream });
 
-      setLocalAudioStream(stream);
+      rawMicStreamRef.current = stream;
 
-      const audioTrack = stream.getAudioTracks()[0];
+      const rawAudioTrack = stream.getAudioTracks()[0];
 
-      if (audioTrack) {
-        audioTrack.enabled = !ownVoiceState.micMuted;
+      if (rawAudioTrack) {
+        let outboundStream = stream;
+        let outboundAudioTrack = rawAudioTrack;
+        try {
+          const micAudioPipeline = await createMicAudioProcessingPipeline({
+            inputTrack: rawAudioTrack,
+            enabled: devices.experimentalVoiceFilter,
+            suppressionLevel: devices.voiceFilterStrength
+          });
 
-        logVoice('Obtained audio track', { audioTrack });
+          if (micAudioPipeline) {
+            micAudioPipelineRef.current = micAudioPipeline;
+            outboundStream = micAudioPipeline.stream;
+            outboundAudioTrack = micAudioPipeline.track;
+            logVoice('Microphone voice filter enabled', {
+              backend: micAudioPipeline.backend,
+              suppressionLevel: devices.voiceFilterStrength
+            });
+          } else {
+            micAudioPipelineRef.current = undefined;
+          }
+        } catch (error) {
+          micAudioPipelineRef.current = undefined;
+          logVoice('Failed to initialize microphone voice filter, using raw mic', {
+            error
+          });
+        }
+
+        setLocalAudioStream(outboundStream);
+        outboundAudioTrack.enabled = !ownVoiceState.micMuted;
+
+        logVoice('Obtained audio track', { audioTrack: outboundAudioTrack });
 
         localAudioProducer.current = await producerTransport.current?.produce({
-          track: audioTrack,
+          track: outboundAudioTrack,
           appData: { kind: StreamKind.AUDIO }
         });
 
@@ -310,12 +368,10 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
           }
         });
 
-        audioTrack.onended = () => {
+        outboundAudioTrack.onended = () => {
           logVoice('Audio track ended, cleaning up microphone');
 
-          localAudioStream?.getAudioTracks().forEach((track) => {
-            track.stop();
-          });
+          void cleanupMicAudioPipeline();
           localAudioProducer.current?.close();
 
           setLocalAudioStream(undefined);
@@ -325,16 +381,20 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
       }
     } catch (error) {
       logVoice('Error starting microphone stream', { error });
+      await cleanupMicAudioPipeline();
+      setLocalAudioStream(undefined);
     }
   }, [
+    cleanupMicAudioPipeline,
     producerTransport,
     setLocalAudioStream,
     localAudioProducer,
-    localAudioStream,
     devices.microphoneId,
     devices.autoGainControl,
     devices.echoCancellation,
     devices.noiseSuppression,
+    devices.experimentalVoiceFilter,
+    devices.voiceFilterStrength,
     ownVoiceState.micMuted
   ]);
 
@@ -898,6 +958,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     logVoice('Running voice provider cleanup');
 
     void cleanupDesktopAppAudio();
+    void cleanupMicAudioPipeline();
     stopMonitoring();
     resetStats();
     clearLocalStreams();
@@ -911,6 +972,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     stopMonitoring,
     resetStats,
     cleanupDesktopAppAudio,
+    cleanupMicAudioPipeline,
     clearLocalStreams,
     clearRemoteUserStreams,
     clearExternalStreams,

@@ -1,57 +1,60 @@
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
+use deep_filter::tract::{DfParams, DfTract, ReduceMask, RuntimeParams};
+use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, VecDeque};
 use std::io::{self, BufRead, Write};
-use std::mem::size_of;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 #[cfg(windows)]
 use std::ffi::c_void;
 #[cfg(windows)]
+use std::mem::size_of;
+#[cfg(windows)]
 use std::path::Path;
 #[cfg(windows)]
 use std::ptr;
+#[cfg(windows)]
+use std::time::{Duration, Instant};
 
 #[cfg(windows)]
-use windows::core::{Interface, IUnknown, PWSTR};
-#[cfg(windows)]
-use windows_core::implement;
+use windows::core::{IUnknown, Interface, PWSTR};
 #[cfg(windows)]
 use windows::Win32::Foundation::{BOOL, HANDLE, HWND, LPARAM, WAIT_TIMEOUT};
 #[cfg(windows)]
 use windows::Win32::Media::Audio::{
     ActivateAudioInterfaceAsync, IActivateAudioInterfaceAsyncOperation,
     IActivateAudioInterfaceCompletionHandler, IAudioCaptureClient, IAudioClient,
-    AUDIOCLIENT_ACTIVATION_PARAMS,
+    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_E_INVALID_STREAM_FLAG, AUDCLNT_SHAREMODE_SHARED,
+    AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, AUDCLNT_STREAMFLAGS_LOOPBACK,
+    AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, AUDIOCLIENT_ACTIVATION_PARAMS,
     AUDIOCLIENT_ACTIVATION_PARAMS_0, AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
-    AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_E_INVALID_STREAM_FLAG,
-    AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, AUDCLNT_STREAMFLAGS_LOOPBACK,
-    AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
+    AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
     VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, WAVEFORMATEX,
 };
 #[cfg(windows)]
-use windows::Win32::System::Com::{
-    CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED,
-};
-#[cfg(windows)]
-use windows::Win32::System::Variant::VT_BLOB;
+use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
 #[cfg(windows)]
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, WaitForSingleObject, PROCESS_NAME_WIN32,
     PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE,
 };
 #[cfg(windows)]
+use windows::Win32::System::Variant::VT_BLOB;
+#[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindow, GetWindowLongW, GetWindowTextLengthW, GetWindowTextW,
     GetWindowThreadProcessId, IsWindow, IsWindowVisible, GWL_EXSTYLE, GW_OWNER, WS_EX_TOOLWINDOW,
 };
+#[cfg(windows)]
+use windows_core::implement;
 
 const TARGET_SAMPLE_RATE: u32 = 48_000;
 const TARGET_CHANNELS: usize = 2;
@@ -61,7 +64,8 @@ const PCM_ENCODING: &str = "f32le_base64";
 
 #[derive(Debug, Deserialize)]
 struct SidecarRequest {
-    id: String,
+    #[serde(default)]
+    id: Option<String>,
     method: String,
     #[serde(default)]
     params: Value,
@@ -122,6 +126,42 @@ struct StopAudioCaptureParams {
     session_id: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+enum VoiceFilterStrength {
+    Low,
+    Balanced,
+    High,
+    Aggressive,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StartVoiceFilterParams {
+    sample_rate: usize,
+    channels: usize,
+    suppression_level: VoiceFilterStrength,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StopVoiceFilterParams {
+    session_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VoiceFilterPushFrameParams {
+    session_id: String,
+    sequence: u64,
+    sample_rate: usize,
+    channels: usize,
+    frame_count: usize,
+    pcm_base64: String,
+    protocol_version: Option<u32>,
+    encoding: Option<String>,
+}
+
 #[derive(Debug, Clone, Copy)]
 enum CaptureEndReason {
     CaptureStopped,
@@ -170,9 +210,37 @@ struct CaptureSession {
     handle: JoinHandle<()>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct VoiceFilterConfig {
+    post_filter_beta: f32,
+    atten_lim_db: f32,
+    min_db_thresh: f32,
+    max_db_erb_thresh: f32,
+    max_db_df_thresh: f32,
+}
+
+struct DeepFilterProcessor {
+    model: DfTract,
+    hop_size: usize,
+    input_buffers: Vec<VecDeque<f32>>,
+    output_buffers: Vec<VecDeque<f32>>,
+}
+
+enum VoiceFilterProcessor {
+    DeepFilter(DeepFilterProcessor),
+}
+
+struct VoiceFilterSession {
+    session_id: String,
+    sample_rate: usize,
+    channels: usize,
+    processor: VoiceFilterProcessor,
+}
+
 #[derive(Default)]
 struct SidecarState {
     capture_session: Option<CaptureSession>,
+    voice_filter_session: Option<VoiceFilterSession>,
 }
 
 #[derive(Default)]
@@ -347,6 +415,256 @@ fn enqueue_frame_event(
     }
 }
 
+fn enqueue_voice_filter_frame_event(
+    queue: &Arc<FrameQueue>,
+    session_id: &str,
+    sequence: u64,
+    sample_rate: usize,
+    channels: usize,
+    frame_count: usize,
+    pcm_base64: String,
+) {
+    let dropped_count = queue.take_dropped_count();
+
+    let mut params = json!({
+        "sessionId": session_id,
+        "sequence": sequence,
+        "sampleRate": sample_rate,
+        "channels": channels,
+        "frameCount": frame_count,
+        "pcmBase64": pcm_base64,
+        "protocolVersion": PROTOCOL_VERSION,
+        "encoding": PCM_ENCODING,
+    });
+
+    if dropped_count > 0 {
+        params["droppedFrameCount"] = json!(dropped_count);
+    }
+
+    if let Ok(serialized) = serde_json::to_string(&SidecarEvent {
+        event: "voice_filter.frame",
+        params,
+    }) {
+        queue.push_line(serialized);
+    }
+}
+
+fn enqueue_voice_filter_ended_event(
+    queue: &Arc<FrameQueue>,
+    session_id: &str,
+    reason: &str,
+    error: Option<String>,
+) {
+    let mut params = json!({
+        "sessionId": session_id,
+        "reason": reason,
+        "protocolVersion": PROTOCOL_VERSION,
+    });
+
+    if let Some(message) = error {
+        params["error"] = json!(message);
+    }
+
+    if let Ok(serialized) = serde_json::to_string(&SidecarEvent {
+        event: "voice_filter.ended",
+        params,
+    }) {
+        queue.push_line(serialized);
+    }
+}
+
+fn voice_filter_config(strength: VoiceFilterStrength) -> VoiceFilterConfig {
+    match strength {
+        VoiceFilterStrength::Low => VoiceFilterConfig {
+            post_filter_beta: 0.0,
+            atten_lim_db: 24.0,
+            min_db_thresh: -15.0,
+            max_db_erb_thresh: 35.0,
+            max_db_df_thresh: 20.0,
+        },
+        VoiceFilterStrength::Balanced => VoiceFilterConfig {
+            post_filter_beta: 0.01,
+            atten_lim_db: 40.0,
+            min_db_thresh: -15.0,
+            max_db_erb_thresh: 33.0,
+            max_db_df_thresh: 18.0,
+        },
+        VoiceFilterStrength::High => VoiceFilterConfig {
+            post_filter_beta: 0.02,
+            atten_lim_db: 55.0,
+            min_db_thresh: -18.0,
+            max_db_erb_thresh: 30.0,
+            max_db_df_thresh: 15.0,
+        },
+        VoiceFilterStrength::Aggressive => VoiceFilterConfig {
+            post_filter_beta: 0.03,
+            atten_lim_db: 70.0,
+            min_db_thresh: -20.0,
+            max_db_erb_thresh: 28.0,
+            max_db_df_thresh: 12.0,
+        },
+    }
+}
+
+fn create_deep_filter_processor(
+    channels: usize,
+    suppression_level: VoiceFilterStrength,
+) -> Result<DeepFilterProcessor, String> {
+    let config = voice_filter_config(suppression_level);
+
+    let reduce_mask = if channels > 1 {
+        ReduceMask::MEAN
+    } else {
+        ReduceMask::NONE
+    };
+
+    let runtime_params = RuntimeParams::default_with_ch(channels)
+        .with_mask_reduce(reduce_mask)
+        .with_post_filter(config.post_filter_beta)
+        .with_atten_lim(config.atten_lim_db)
+        .with_thresholds(
+            config.min_db_thresh,
+            config.max_db_erb_thresh,
+            config.max_db_df_thresh,
+        );
+
+    let df_params = DfParams::default();
+    let model = DfTract::new(df_params, &runtime_params)
+        .map_err(|error| format!("Failed to initialize DeepFilterNet runtime: {error}"))?;
+    let hop_size = model.hop_size;
+
+    Ok(DeepFilterProcessor {
+        model,
+        hop_size,
+        input_buffers: (0..channels).map(|_| VecDeque::new()).collect(),
+        output_buffers: (0..channels).map(|_| VecDeque::new()).collect(),
+    })
+}
+
+fn create_voice_filter_session(
+    session_id: String,
+    sample_rate: usize,
+    channels: usize,
+    suppression_level: VoiceFilterStrength,
+) -> Result<VoiceFilterSession, String> {
+    if sample_rate != TARGET_SAMPLE_RATE as usize {
+        return Err("DeepFilterNet currently requires 48kHz input".to_string());
+    }
+
+    if channels == 0 {
+        return Err("Unsupported voice filter channel count".to_string());
+    }
+
+    let processor = create_deep_filter_processor(channels, suppression_level)?;
+
+    Ok(VoiceFilterSession {
+        session_id,
+        sample_rate,
+        channels,
+        processor: VoiceFilterProcessor::DeepFilter(processor),
+    })
+}
+
+fn decode_f32le_base64(pcm_base64: &str) -> Result<Vec<f32>, String> {
+    let decoded = BASE64
+        .decode(pcm_base64)
+        .map_err(|error| format!("Failed to decode PCM base64: {error}"))?;
+
+    if decoded.len() % 4 != 0 {
+        return Err("Invalid PCM byte length".to_string());
+    }
+
+    let mut samples = Vec::with_capacity(decoded.len() / 4);
+    for chunk in decoded.chunks_exact(4) {
+        let sample = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        samples.push(sample);
+    }
+
+    Ok(samples)
+}
+
+fn process_voice_filter_frame(
+    session: &mut VoiceFilterSession,
+    samples: &mut [f32],
+    channels: usize,
+) -> Result<usize, String> {
+    if samples.is_empty() || channels == 0 {
+        return Ok(0);
+    }
+
+    let frame_count = samples.len() / channels;
+
+    if frame_count == 0 {
+        return Ok(0);
+    }
+
+    if samples.len() != frame_count * channels {
+        return Err("Voice filter frame sample count mismatch".to_string());
+    }
+
+    match &mut session.processor {
+        VoiceFilterProcessor::DeepFilter(processor) => {
+            let hop_size = processor.hop_size;
+
+            for frame_index in 0..frame_count {
+                for channel_index in 0..channels {
+                    let sample = samples[frame_index * channels + channel_index];
+                    processor.input_buffers[channel_index].push_back(sample);
+                }
+            }
+
+            while processor
+                .input_buffers
+                .iter()
+                .all(|buffer| buffer.len() >= hop_size)
+            {
+                let mut noisy = Array2::<f32>::zeros((channels, hop_size));
+                let mut enhanced = Array2::<f32>::zeros((channels, hop_size));
+
+                for channel_index in 0..channels {
+                    for sample_index in 0..hop_size {
+                        noisy[(channel_index, sample_index)] = processor.input_buffers
+                            [channel_index]
+                            .pop_front()
+                            .unwrap_or(0.0);
+                    }
+                }
+
+                processor
+                    .model
+                    .process(noisy.view(), enhanced.view_mut())
+                    .map_err(|error| format!("DeepFilterNet processing failed: {error}"))?;
+
+                for channel_index in 0..channels {
+                    for sample_index in 0..hop_size {
+                        processor.output_buffers[channel_index]
+                            .push_back(enhanced[(channel_index, sample_index)]);
+                    }
+                }
+            }
+
+            for frame_index in 0..frame_count {
+                for channel_index in 0..channels {
+                    let index = frame_index * channels + channel_index;
+                    if let Some(filtered_sample) =
+                        processor.output_buffers[channel_index].pop_front()
+                    {
+                        samples[index] = filtered_sample;
+                    }
+                }
+            }
+
+            Ok(frame_count)
+        }
+    }
+}
+
+fn voice_filter_frames_per_buffer(session: &VoiceFilterSession) -> usize {
+    match &session.processor {
+        VoiceFilterProcessor::DeepFilter(processor) => processor.hop_size,
+    }
+}
+
 fn parse_target_pid(target_id: &str) -> Option<u32> {
     target_id
         .strip_prefix("pid:")
@@ -449,6 +767,11 @@ fn process_name_from_pid(pid: u32) -> Option<String> {
         .unwrap_or(full_path);
 
     Some(file_name)
+}
+
+#[cfg(not(windows))]
+fn process_name_from_pid(_pid: u32) -> Option<String> {
+    None
 }
 
 #[cfg(windows)]
@@ -619,8 +942,8 @@ fn activate_process_loopback_client(target_pid: u32) -> Result<IAudioClient, Str
             },
         },
     };
-    let activation_prop_ptr =
-        (&activation_prop as *const windows_core::imp::PROPVARIANT).cast::<windows_core::PROPVARIANT>();
+    let activation_prop_ptr = (&activation_prop as *const windows_core::imp::PROPVARIANT)
+        .cast::<windows_core::PROPVARIANT>();
 
     let operation = unsafe {
         ActivateAudioInterfaceAsync(
@@ -793,9 +1116,8 @@ fn capture_loopback_audio(
                 let _ = unsafe { capture_client.ReleaseBuffer(frame_count) };
 
                 while pending.len() >= FRAME_SIZE * TARGET_CHANNELS {
-                    let frame_samples: Vec<f32> = pending
-                        .drain(..FRAME_SIZE * TARGET_CHANNELS)
-                        .collect();
+                    let frame_samples: Vec<f32> =
+                        pending.drain(..FRAME_SIZE * TARGET_CHANNELS).collect();
                     let frame_bytes = bytemuck::cast_slice(&frame_samples);
                     let pcm_base64 = BASE64.encode(frame_bytes);
 
@@ -879,11 +1201,7 @@ fn start_capture_thread(
             ended_params["error"] = json!(error);
         }
 
-        write_event(
-            &stdout,
-            "audio_capture.ended",
-            ended_params,
-        );
+        write_event(&stdout, "audio_capture.ended", ended_params);
     })
 }
 
@@ -902,10 +1220,12 @@ fn handle_capabilities_get() -> Result<Value, String> {
     } else {
         "unsupported"
     };
+    let voice_filter = "supported";
 
     Ok(json!({
         "platform": platform,
         "perAppAudio": per_app_audio,
+        "voiceFilter": voice_filter,
         "protocolVersion": PROTOCOL_VERSION,
         "encoding": PCM_ENCODING,
     }))
@@ -960,6 +1280,29 @@ fn stop_capture_session(state: &mut SidecarState, requested_session_id: Option<&
     state.capture_session = Some(active_session);
 }
 
+fn stop_voice_filter_session(
+    state: &mut SidecarState,
+    frame_queue: &Arc<FrameQueue>,
+    requested_session_id: Option<&str>,
+    reason: &str,
+    error: Option<String>,
+) {
+    let Some(active_session) = state.voice_filter_session.take() else {
+        return;
+    };
+
+    let should_stop = requested_session_id
+        .map(|session_id| session_id == active_session.session_id)
+        .unwrap_or(true);
+
+    if should_stop {
+        enqueue_voice_filter_ended_event(frame_queue, &active_session.session_id, reason, error);
+        return;
+    }
+
+    state.voice_filter_session = Some(active_session);
+}
+
 fn handle_audio_capture_start(
     stdout: Arc<Mutex<io::Stdout>>,
     frame_queue: Arc<FrameQueue>,
@@ -989,10 +1332,14 @@ fn handle_audio_capture_start(
     let target_pid =
         parse_target_pid(&target_id).ok_or_else(|| "Invalid app audio target id".to_string())?;
 
-    let target_exists = get_audio_targets().iter().any(|target| target.id == target_id);
+    let target_exists = get_audio_targets()
+        .iter()
+        .any(|target| target.id == target_id);
 
     if !target_exists {
-        return Err(format!("Target process with pid {target_pid} is not available"));
+        return Err(format!(
+            "Target process with pid {target_pid} is not available"
+        ));
     }
 
     let session_id = Uuid::new_v4().to_string();
@@ -1041,6 +1388,135 @@ fn handle_audio_capture_stop(state: &mut SidecarState, params: Value) -> Result<
     }))
 }
 
+fn handle_voice_filter_start(
+    frame_queue: Arc<FrameQueue>,
+    state: &mut SidecarState,
+    params: Value,
+) -> Result<Value, String> {
+    let parsed: StartVoiceFilterParams =
+        serde_json::from_value(params).map_err(|error| format!("invalid params: {error}"))?;
+
+    if parsed.sample_rate != TARGET_SAMPLE_RATE as usize {
+        return Err("DeepFilterNet currently supports only 48kHz input".to_string());
+    }
+
+    if parsed.channels == 0 || parsed.channels > 2 {
+        return Err("Unsupported voice filter channel count".to_string());
+    }
+
+    stop_voice_filter_session(state, &frame_queue, None, "capture_stopped", None);
+
+    let session_id = Uuid::new_v4().to_string();
+    let session = create_voice_filter_session(
+        session_id.clone(),
+        parsed.sample_rate,
+        parsed.channels,
+        parsed.suppression_level,
+    )?;
+    let frames_per_buffer = voice_filter_frames_per_buffer(&session);
+
+    state.voice_filter_session = Some(session);
+
+    Ok(json!({
+        "sessionId": session_id,
+        "sampleRate": parsed.sample_rate,
+        "channels": parsed.channels,
+        "framesPerBuffer": frames_per_buffer,
+        "protocolVersion": PROTOCOL_VERSION,
+        "encoding": PCM_ENCODING,
+    }))
+}
+
+fn handle_voice_filter_push_frame(
+    frame_queue: Arc<FrameQueue>,
+    state: &mut SidecarState,
+    params: Value,
+) -> Result<Value, String> {
+    let parsed: VoiceFilterPushFrameParams =
+        serde_json::from_value(params).map_err(|error| format!("invalid params: {error}"))?;
+
+    let Some(session) = state.voice_filter_session.as_mut() else {
+        return Err("No active voice filter session".to_string());
+    };
+
+    if session.session_id != parsed.session_id {
+        return Err("Voice filter session mismatch".to_string());
+    }
+
+    if let Some(protocol_version) = parsed.protocol_version {
+        if protocol_version != PROTOCOL_VERSION {
+            return Err("Unsupported voice filter protocol version".to_string());
+        }
+    }
+
+    if let Some(encoding) = parsed.encoding {
+        if encoding != PCM_ENCODING {
+            return Err("Unsupported voice filter frame encoding".to_string());
+        }
+    }
+
+    if parsed.sample_rate != session.sample_rate {
+        return Err("Voice filter sample rate mismatch".to_string());
+    }
+
+    if parsed.channels != session.channels {
+        return Err("Voice filter channel count mismatch".to_string());
+    }
+
+    if parsed.channels == 0 || parsed.channels > 2 {
+        return Err("Unsupported voice filter frame channel count".to_string());
+    }
+
+    let mut samples = decode_f32le_base64(&parsed.pcm_base64)?;
+    process_voice_filter_frame(session, &mut samples, parsed.channels)?;
+
+    let expected_frame_count = parsed.frame_count;
+
+    if samples.len() != expected_frame_count * parsed.channels {
+        return Err("Voice filter frame sample count mismatch".to_string());
+    }
+
+    let frame_bytes = bytemuck::cast_slice(&samples);
+    let pcm_base64 = BASE64.encode(frame_bytes);
+
+    enqueue_voice_filter_frame_event(
+        &frame_queue,
+        &session.session_id,
+        parsed.sequence,
+        parsed.sample_rate,
+        parsed.channels,
+        expected_frame_count,
+        pcm_base64,
+    );
+
+    Ok(json!({
+        "accepted": true,
+        "protocolVersion": PROTOCOL_VERSION,
+    }))
+}
+
+fn handle_voice_filter_stop(
+    frame_queue: Arc<FrameQueue>,
+    state: &mut SidecarState,
+    params: Value,
+) -> Result<Value, String> {
+    let parsed: StopVoiceFilterParams =
+        serde_json::from_value(params).map_err(|error| format!("invalid params: {error}"))?;
+
+    stop_voice_filter_session(
+        state,
+        &frame_queue,
+        parsed.session_id.as_deref(),
+        "capture_stopped",
+        None,
+    );
+
+    Ok(json!({
+        "stopped": true,
+        "protocolVersion": PROTOCOL_VERSION,
+    }))
+}
+
 fn main() {
     eprintln!("[capture-sidecar] starting");
 
@@ -1082,13 +1558,32 @@ fn main() {
                 request.params,
             ),
             "audio_capture.stop" => handle_audio_capture_stop(&mut state, request.params),
+            "voice_filter.start" => {
+                handle_voice_filter_start(request_frame_queue.clone(), &mut state, request.params)
+            }
+            "voice_filter.push_frame" => handle_voice_filter_push_frame(
+                request_frame_queue.clone(),
+                &mut state,
+                request.params,
+            ),
+            "voice_filter.stop" => {
+                handle_voice_filter_stop(request_frame_queue.clone(), &mut state, request.params)
+            }
             _ => Err(format!("Unknown method: {}", request.method)),
         };
 
-        write_response(&request_stdout, &request.id, result);
+        if let Some(id) = request.id.as_deref() {
+            write_response(&request_stdout, id, result);
+        } else if let Err(error) = result {
+            eprintln!(
+                "[capture-sidecar] notification method={} failed: {}",
+                request.method, error
+            );
+        }
     }
 
     stop_capture_session(&mut state, None);
+    stop_voice_filter_session(&mut state, &frame_queue, None, "capture_stopped", None);
     frame_queue.close();
     let _ = frame_writer.join();
 

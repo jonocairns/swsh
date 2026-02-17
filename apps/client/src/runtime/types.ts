@@ -95,6 +95,46 @@ export type TAppAudioStatusEvent = {
   protocolVersion?: number;
 };
 
+export type TVoiceFilterStrength =
+  | 'low'
+  | 'balanced'
+  | 'high'
+  | 'aggressive';
+
+export type TVoiceFilterSession = {
+  sessionId: string;
+  sampleRate: number;
+  channels: number;
+  framesPerBuffer: number;
+  protocolVersion?: number;
+  encoding?: 'f32le_base64';
+};
+
+export type TVoiceFilterFrame = {
+  sessionId: string;
+  sequence: number;
+  sampleRate: number;
+  channels: number;
+  frameCount: number;
+  pcmBase64: string;
+  protocolVersion: number;
+  encoding: 'f32le_base64';
+  droppedFrameCount?: number;
+};
+
+export type TVoiceFilterStatusEvent = {
+  sessionId: string;
+  reason: 'capture_stopped' | 'capture_error' | 'sidecar_exited';
+  error?: string;
+  protocolVersion?: number;
+};
+
+export type TStartVoiceFilterInput = {
+  sampleRate: number;
+  channels: number;
+  suppressionLevel: TVoiceFilterStrength;
+};
+
 export type TDesktopBridge = {
   getServerUrl: () => Promise<string>;
   setServerUrl: (serverUrl: string) => Promise<void>;
@@ -110,9 +150,20 @@ export type TDesktopBridge = {
     input: TStartAppAudioCaptureInput
   ) => Promise<TAppAudioSession>;
   stopAppAudioCapture: (sessionId?: string) => Promise<void>;
+  startVoiceFilterSession: (
+    input: TStartVoiceFilterInput
+  ) => Promise<TVoiceFilterSession>;
+  stopVoiceFilterSession: (sessionId?: string) => Promise<void>;
+  pushVoiceFilterFrame: (frame: TVoiceFilterFrame) => void;
   subscribeAppAudioFrames: (cb: (frame: TAppAudioFrame) => void) => () => void;
   subscribeAppAudioStatus: (
     cb: (statusEvent: TAppAudioStatusEvent) => void
+  ) => () => void;
+  subscribeVoiceFilterFrames: (
+    cb: (frame: TVoiceFilterFrame) => void
+  ) => () => void;
+  subscribeVoiceFilterStatus: (
+    cb: (statusEvent: TVoiceFilterStatusEvent) => void
   ) => () => void;
   prepareScreenShare: (
     selection: TDesktopScreenShareSelection

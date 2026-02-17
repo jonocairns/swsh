@@ -41,6 +41,13 @@ export enum VideoCodecPreference {
   AV1 = 'av1'
 }
 
+export enum VoiceFilterStrength {
+  LOW = 'low',
+  BALANCED = 'balanced',
+  HIGH = 'high',
+  AGGRESSIVE = 'aggressive'
+}
+
 export type TDeviceSettings = {
   microphoneId: string | undefined;
   webcamId: string | undefined;
@@ -49,6 +56,8 @@ export type TDeviceSettings = {
   echoCancellation: boolean;
   noiseSuppression: boolean;
   autoGainControl: boolean;
+  experimentalVoiceFilter: boolean;
+  voiceFilterStrength: VoiceFilterStrength;
   screenAudioMode: ScreenAudioMode;
   experimentalRustCapture: boolean;
   mirrorOwnVideo: boolean;
