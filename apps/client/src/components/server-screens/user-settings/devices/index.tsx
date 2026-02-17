@@ -29,7 +29,7 @@ import {
   updateDesktopServerUrl
 } from '@/runtime/server-config';
 import { ScreenAudioMode } from '@/runtime/types';
-import { Resolution } from '@/types';
+import { Resolution, VideoCodecPreference } from '@/types';
 import { Info } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { toast } from 'sonner';
@@ -187,6 +187,35 @@ const Devices = memo(() => {
         </Group>
 
         <Group label="Screen Sharing">
+          <Group label="Video Codec (Webcam + Screen Share)">
+            <div className="space-y-2">
+              <Select
+                onValueChange={(value) =>
+                  onChange('videoCodec', value as VideoCodecPreference)
+                }
+                value={values.videoCodec}
+              >
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue placeholder="Select the video codec" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={VideoCodecPreference.AUTO}>Auto</SelectItem>
+                    <SelectItem value={VideoCodecPreference.VP8}>VP8</SelectItem>
+                    <SelectItem value={VideoCodecPreference.H264}>H264</SelectItem>
+                    <SelectItem value={VideoCodecPreference.AV1}>
+                      AV1 (experimental)
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Auto is recommended. AV1 may be unavailable on some devices, in
+                which case Sharkord automatically falls back.
+              </p>
+            </div>
+          </Group>
+
           <Group label="Audio Mode">
             <Select
               onValueChange={(value) =>

@@ -34,6 +34,13 @@ export enum Resolution {
   '144p' = '144p'
 }
 
+export enum VideoCodecPreference {
+  AUTO = 'auto',
+  VP8 = 'vp8',
+  H264 = 'h264',
+  AV1 = 'av1'
+}
+
 export type TDeviceSettings = {
   microphoneId: string | undefined;
   webcamId: string | undefined;
@@ -47,6 +54,7 @@ export type TDeviceSettings = {
   mirrorOwnVideo: boolean;
   screenResolution: Resolution;
   screenFramerate: number;
+  videoCodec: VideoCodecPreference;
 };
 
 export type TRemoteUserStreamKinds =

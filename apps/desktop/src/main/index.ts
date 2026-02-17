@@ -45,6 +45,7 @@ const createMainWindow = () => {
     height: 920,
     minWidth: 1120,
     minHeight: 720,
+    autoHideMenuBar: true,
     show: false,
     backgroundColor: "#090d12",
     webPreferences: {
@@ -54,6 +55,7 @@ const createMainWindow = () => {
       preload: path.join(__dirname, "..", "preload", "index.cjs"),
     },
   });
+  mainWindow.setMenuBarVisibility(false);
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();

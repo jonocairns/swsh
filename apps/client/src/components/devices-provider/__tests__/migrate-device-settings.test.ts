@@ -1,4 +1,5 @@
 import { ScreenAudioMode } from '@/runtime/types';
+import { VideoCodecPreference } from '@/types';
 import { describe, expect, it } from 'bun:test';
 import {
   DEFAULT_DEVICE_SETTINGS,
@@ -42,5 +43,17 @@ describe('migrateDeviceSettings', () => {
     });
 
     expect(migrated.experimentalRustCapture).toBe(true);
+  });
+
+  it('defaults video codec to auto for legacy settings', () => {
+    const migrated = migrateDeviceSettings({});
+    expect(migrated.videoCodec).toBe(VideoCodecPreference.AUTO);
+  });
+
+  it('preserves explicit video codec values', () => {
+    const migrated = migrateDeviceSettings({
+      videoCodec: VideoCodecPreference.AV1
+    });
+    expect(migrated.videoCodec).toBe(VideoCodecPreference.AV1);
   });
 });

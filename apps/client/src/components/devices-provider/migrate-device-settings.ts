@@ -1,5 +1,5 @@
 import { ScreenAudioMode } from '@/runtime/types';
-import { Resolution, type TDeviceSettings } from '@/types';
+import { Resolution, type TDeviceSettings, VideoCodecPreference } from '@/types';
 
 type TLegacyDeviceSettings = Partial<TDeviceSettings> & {
   shareSystemAudio?: boolean;
@@ -17,7 +17,8 @@ const DEFAULT_DEVICE_SETTINGS: TDeviceSettings = {
   experimentalRustCapture: false,
   mirrorOwnVideo: false,
   screenResolution: Resolution['720p'],
-  screenFramerate: 30
+  screenFramerate: 30,
+  videoCodec: VideoCodecPreference.AUTO
 };
 
 const migrateDeviceSettings = (
@@ -42,6 +43,11 @@ const migrateDeviceSettings = (
     ...DEFAULT_DEVICE_SETTINGS,
     ...incomingSettings,
     screenAudioMode: screenAudioMode || ScreenAudioMode.SYSTEM,
+    videoCodec: Object.values(VideoCodecPreference).includes(
+      incomingSettings.videoCodec as VideoCodecPreference
+    )
+      ? (incomingSettings.videoCodec as VideoCodecPreference)
+      : VideoCodecPreference.AUTO,
     experimentalRustCapture:
       typeof incomingSettings.experimentalRustCapture === 'boolean'
         ? incomingSettings.experimentalRustCapture

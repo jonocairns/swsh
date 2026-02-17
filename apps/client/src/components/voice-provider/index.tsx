@@ -12,9 +12,13 @@ import {
   type TAppAudioSession,
   type TDesktopScreenShareSelection
 } from '@/runtime/types';
+import { VideoCodecPreference } from '@/types';
 import { StreamKind, type TVoiceUserState } from '@sharkord/shared';
 import { Device } from 'mediasoup-client';
-import type { RtpCapabilities } from 'mediasoup-client/types';
+import type {
+  RtpCapabilities,
+  RtpCodecCapability
+} from 'mediasoup-client/types';
 import {
   createContext,
   memo,
@@ -40,6 +44,7 @@ import {
 import { useTransports } from './hooks/use-transports';
 import { useVoiceControls } from './hooks/use-voice-controls';
 import { useVoiceEvents } from './hooks/use-voice-events';
+import { getVideoBitratePolicy } from './video-bitrate-policy';
 import { VolumeControlProvider } from './volume-control-context';
 
 type AudioVideoRefs = {
@@ -59,6 +64,32 @@ enum ConnectionStatus {
   CONNECTED = 'connected',
   FAILED = 'failed'
 }
+
+const VIDEO_CODEC_MIME_TYPE_BY_PREFERENCE: Record<string, string> = {
+  [VideoCodecPreference.VP8]: 'video/VP8',
+  [VideoCodecPreference.H264]: 'video/H264',
+  [VideoCodecPreference.AV1]: 'video/AV1'
+};
+
+const resolvePreferredVideoCodec = (
+  rtpCapabilities: RtpCapabilities | null,
+  preference: VideoCodecPreference
+): RtpCodecCapability | undefined => {
+  if (!rtpCapabilities || preference === VideoCodecPreference.AUTO) {
+    return undefined;
+  }
+
+  const preferredMimeType =
+    VIDEO_CODEC_MIME_TYPE_BY_PREFERENCE[preference]?.toLowerCase();
+
+  if (!preferredMimeType) {
+    return undefined;
+  }
+
+  return (rtpCapabilities.codecs ?? []).find((codec) => {
+    return codec.mimeType.toLowerCase() === preferredMimeType;
+  });
+};
 
 export type TVoiceProvider = {
   loading: boolean;
@@ -137,6 +168,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     ConnectionStatus.DISCONNECTED
   );
   const routerRtpCapabilities = useRef<RtpCapabilities | null>(null);
+  const sendRtpCapabilities = useRef<RtpCapabilities | null>(null);
   const audioVideoRefsMap = useRef<Map<number, AudioVideoRefs>>(new Map());
   const ownVoiceState = useOwnVoiceState();
   const { devices } = useDevices();
@@ -151,7 +183,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     undefined
   );
   const appAudioStartupTimeoutRef = useRef<
-    ReturnType<typeof window.setTimeout> | undefined
+    number | ReturnType<typeof setTimeout> | undefined
   >(undefined);
   const standbyDisplayAudioTrackRef = useRef<MediaStreamTrack | undefined>(
     undefined
@@ -310,12 +342,16 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     try {
       logVoice('Starting webcam stream');
 
+      const requestedWebcamResolution = getResWidthHeight(
+        devices?.webcamResolution
+      );
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           deviceId: { exact: devices?.webcamId },
           frameRate: devices.webcamFramerate,
-          ...getResWidthHeight(devices?.webcamResolution)
+          ...requestedWebcamResolution
         }
       });
 
@@ -328,8 +364,38 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
       if (videoTrack) {
         logVoice('Obtained video track', { videoTrack });
 
+        const preferredVideoCodec = resolvePreferredVideoCodec(
+          sendRtpCapabilities.current,
+          devices.videoCodec
+        );
+
+        if (
+          devices.videoCodec !== VideoCodecPreference.AUTO &&
+          !preferredVideoCodec
+        ) {
+          logVoice('Preferred webcam codec unavailable, falling back to auto', {
+            preferredCodec: devices.videoCodec
+          });
+        }
+
+        const webcamTrackSettings = videoTrack.getSettings();
+        const webcamBitratePolicy = getVideoBitratePolicy({
+          profile: 'camera',
+          width: webcamTrackSettings.width ?? requestedWebcamResolution.width,
+          height: webcamTrackSettings.height ?? requestedWebcamResolution.height,
+          frameRate: webcamTrackSettings.frameRate ?? devices.webcamFramerate,
+          codecMimeType: preferredVideoCodec?.mimeType
+        });
+
         localVideoProducer.current = await producerTransport.current?.produce({
           track: videoTrack,
+          codec: preferredVideoCodec,
+          encodings: [{ maxBitrate: webcamBitratePolicy.maxBitrateBps }],
+          codecOptions: {
+            videoGoogleMinBitrate: webcamBitratePolicy.minKbps,
+            videoGoogleStartBitrate: webcamBitratePolicy.startKbps,
+            videoGoogleMaxBitrate: webcamBitratePolicy.maxKbps
+          },
           appData: { kind: StreamKind.VIDEO }
         });
 
@@ -375,7 +441,8 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     localVideoStream,
     devices.webcamId,
     devices.webcamFramerate,
-    devices.webcamResolution
+    devices.webcamResolution,
+    devices.videoCodec
   ]);
 
   const stopWebcamStream = useCallback(() => {
@@ -644,10 +711,13 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
         // Electron main only provides display-capture audio in system mode.
         // Requesting audio in per-app mode can abort capture startup.
         const shouldCaptureDisplayAudio = audioMode === ScreenAudioMode.SYSTEM;
+        const requestedScreenResolution = getResWidthHeight(
+          devices?.screenResolution
+        );
 
         stream = await navigator.mediaDevices.getDisplayMedia({
           video: {
-            ...getResWidthHeight(devices?.screenResolution),
+            ...requestedScreenResolution,
             frameRate: devices?.screenFramerate
           },
           audio: shouldCaptureDisplayAudio
@@ -678,9 +748,45 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
         if (videoTrack) {
           logVoice('Obtained video track', { videoTrack });
 
+          // Favor text/detail preservation for desktop/screen content.
+          videoTrack.contentHint = 'detail';
+
+          const preferredVideoCodec = resolvePreferredVideoCodec(
+            sendRtpCapabilities.current,
+            devices.videoCodec
+          );
+
+          if (
+            devices.videoCodec !== VideoCodecPreference.AUTO &&
+            !preferredVideoCodec
+          ) {
+            logVoice(
+              'Preferred screen share codec unavailable, falling back to auto',
+              {
+                preferredCodec: devices.videoCodec
+              }
+            );
+          }
+
+          const screenTrackSettings = videoTrack.getSettings();
+          const screenBitratePolicy = getVideoBitratePolicy({
+            profile: 'screen',
+            width: screenTrackSettings.width ?? requestedScreenResolution.width,
+            height: screenTrackSettings.height ?? requestedScreenResolution.height,
+            frameRate: screenTrackSettings.frameRate ?? devices.screenFramerate,
+            codecMimeType: preferredVideoCodec?.mimeType
+          });
+
           localScreenShareProducer.current =
             await producerTransport.current?.produce({
               track: videoTrack,
+              encodings: [{ maxBitrate: screenBitratePolicy.maxBitrateBps }],
+              codecOptions: {
+                videoGoogleMinBitrate: screenBitratePolicy.minKbps,
+                videoGoogleStartBitrate: screenBitratePolicy.startKbps,
+                videoGoogleMaxBitrate: screenBitratePolicy.maxKbps
+              },
+              codec: preferredVideoCodec,
               appData: { kind: StreamKind.SCREEN }
             });
 
@@ -783,7 +889,8 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
       devices.experimentalRustCapture,
       devices.screenAudioMode,
       devices.screenResolution,
-      devices.screenFramerate
+      devices.screenFramerate,
+      devices.videoCodec
     ]
   );
 
@@ -797,6 +904,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     clearRemoteUserStreams();
     clearExternalStreams();
     cleanupTransports();
+    sendRtpCapabilities.current = null;
 
     setConnectionStatus(ConnectionStatus.DISCONNECTED);
   }, [
@@ -832,6 +940,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
         await device.load({
           routerRtpCapabilities: incomingRouterRtpCapabilities
         });
+        sendRtpCapabilities.current = device.rtpCapabilities;
 
         await createProducerTransport(device);
         await createConsumerTransport(device);
