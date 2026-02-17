@@ -2,7 +2,6 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import EventEmitter from "node:events";
 import fs from "node:fs";
 import path from "node:path";
-import { app } from "electron";
 import type {
   TAppAudioFrame,
   TAppAudioSession,
@@ -50,6 +49,29 @@ const SIDECAR_BINARY_NAME =
   process.platform === "win32"
     ? "sharkord-capture-sidecar.exe"
     : "sharkord-capture-sidecar";
+
+const runtimeRequire: NodeJS.Require | undefined =
+  typeof require === "function" ? require : undefined;
+
+type TElectronAppLike = {
+  isPackaged?: boolean;
+};
+
+const resolveElectronApp = (): TElectronAppLike | undefined => {
+  try {
+    if (!runtimeRequire) {
+      return undefined;
+    }
+
+    const electronModule = runtimeRequire("electron") as {
+      app?: TElectronAppLike;
+    };
+
+    return electronModule.app;
+  } catch {
+    return undefined;
+  }
+};
 
 const isSidecarResponse = (value: unknown): value is TSidecarResponse => {
   if (!value || typeof value !== "object") {
@@ -226,8 +248,9 @@ class CaptureSidecarManager {
 
   private getCandidatePaths() {
     const candidates: string[] = [];
+    const isPackaged = resolveElectronApp()?.isPackaged === true;
 
-    if (app.isPackaged) {
+    if (isPackaged) {
       candidates.push(
         path.join(
           process.resourcesPath,

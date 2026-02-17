@@ -31,7 +31,7 @@ const Connect = memo(() => {
     rememberCredentials: boolean;
   }>({
     identity: getLocalStorageItem(LocalStorageKey.IDENTITY) || '',
-    password: getLocalStorageItem(LocalStorageKey.USER_PASSWORD) || '',
+    password: '',
     rememberCredentials: !!getLocalStorageItem(
       LocalStorageKey.REMEMBER_CREDENTIALS
     )
@@ -58,6 +58,7 @@ const Connect = memo(() => {
         setLocalStorageItem(LocalStorageKey.REMEMBER_CREDENTIALS, 'true');
       } else {
         removeLocalStorageItem(LocalStorageKey.REMEMBER_CREDENTIALS);
+        removeLocalStorageItem(LocalStorageKey.IDENTITY);
       }
     },
     [onChange]
@@ -93,7 +94,8 @@ const Connect = memo(() => {
 
       if (values.rememberCredentials) {
         setLocalStorageItem(LocalStorageKey.IDENTITY, values.identity);
-        setLocalStorageItem(LocalStorageKey.USER_PASSWORD, values.password);
+      } else {
+        removeLocalStorageItem(LocalStorageKey.IDENTITY);
       }
 
       await connect();

@@ -32,7 +32,9 @@ const createHttpServer = async (port: number = config.server.port) => {
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', '*');
 
-        const info = getWsInfo(undefined, req);
+        const info = getWsInfo(undefined, req, {
+          trustProxy: config.server.trustProxy
+        });
 
         logger.debug(
           `${chalk.dim('[HTTP]')} ${req.method} ${req.url} - ${info?.ip}`

@@ -1,8 +1,9 @@
-import { ActivityLogType, sha256, type TJoinedUser } from '@sharkord/shared';
+import { ActivityLogType, type TJoinedUser } from '@sharkord/shared';
 import { eq, sql } from 'drizzle-orm';
 import http from 'http';
 import jwt from 'jsonwebtoken';
 import z from 'zod';
+import { config } from '../config';
 import { db } from '../db';
 import { publishUser } from '../db/publishers';
 import { isInviteValid } from '../db/queries/invites';
@@ -11,6 +12,7 @@ import { getServerToken, getSettings } from '../db/queries/server';
 import { getUserByIdentity } from '../db/queries/users';
 import { invites, userRoles, users } from '../db/schema';
 import { getWsInfo } from '../helpers/get-ws-info';
+import { hashPassword, isArgon2Hash, verifyPassword } from '../helpers/password';
 import { enqueueActivityLog } from '../queues/activity-log';
 import { invariant } from '../utils/invariant';
 import { getJsonBody } from './helpers';
@@ -28,7 +30,7 @@ const registerUser = async (
   inviteCode?: string,
   ip?: string
 ): Promise<TJoinedUser> => {
-  const hashedPassword = await sha256(password);
+  const hashedPassword = await hashPassword(password);
 
   const defaultRole = await getDefaultRole();
 
@@ -81,7 +83,9 @@ const loginRouteHandler = async (
   const data = zBody.parse(await getJsonBody(req));
   const settings = await getSettings();
   let existingUser = await getUserByIdentity(data.identity);
-  const connectionInfo = getWsInfo(undefined, req);
+  const connectionInfo = getWsInfo(undefined, req, {
+    trustProxy: config.server.trustProxy
+  });
 
   if (!existingUser) {
     if (!settings.allowNewUsers) {
@@ -116,11 +120,20 @@ const loginRouteHandler = async (
     );
   }
 
-  const hashedPassword = await sha256(data.password);
-  const passwordMatches = existingUser.password === hashedPassword;
+  const passwordMatches = await verifyPassword(data.password, existingUser.password);
 
   if (!passwordMatches) {
     throw new HttpValidationError('password', 'Invalid password');
+  }
+
+  if (!isArgon2Hash(existingUser.password)) {
+    const upgradedPassword = await hashPassword(data.password);
+
+    await db
+      .update(users)
+      .set({ password: upgradedPassword })
+      .where(eq(users.id, existingUser.id))
+      .run();
   }
 
   const token = jwt.sign({ userId: existingUser.id }, await getServerToken(), {

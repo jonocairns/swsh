@@ -15,6 +15,7 @@ import {
 import { eq } from 'drizzle-orm';
 import http from 'http';
 import { WebSocketServer, type WebSocket } from 'ws';
+import { config } from '../config';
 import { db } from '../db';
 import { getAllChannelUserPermissions } from '../db/queries/channels';
 import { getUserById, getUserByToken } from '../db/queries/users';
@@ -155,13 +156,19 @@ const createContext = async ({
   };
 
   const getConnectionInfo = () => {
-    if (!wss) return getWsInfo(undefined, req);
+    if (!wss) {
+      return getWsInfo(undefined, req, {
+        trustProxy: config.server.trustProxy
+      });
+    }
 
     const ws = getTrackedClients().find((client) => client.token === token);
 
     if (!ws) return undefined;
 
-    return getWsInfo(ws, req);
+    return getWsInfo(ws, req, {
+      trustProxy: config.server.trustProxy
+    });
   };
 
   const needsPermission = async (

@@ -57,7 +57,7 @@ const StatsPopover = memo(({ children }: StatsPopoverProps) => {
     }
 
     return Math.max(0, Date.now() - appAudioDebug.lastFrameAtMs);
-  }, [appAudioDebug.lastFrameAtMs, appAudioDebug.totalFrames]);
+  }, [appAudioDebug.lastFrameAtMs]);
 
   useEffect(() => {
     const desktopBridge = getDesktopBridge();

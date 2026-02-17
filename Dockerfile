@@ -2,6 +2,7 @@ FROM oven/bun:1.3.5
 
 ARG TARGETARCH
 ENV RUNNING_IN_DOCKER=true
+ENV SHARKORD_TRUST_PROXY=true
 
 COPY apps/server/build/out/sharkord-linux-x64 /tmp/sharkord-linux-x64
 COPY apps/server/build/out/sharkord-linux-arm64 /tmp/sharkord-linux-arm64

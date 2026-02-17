@@ -69,9 +69,9 @@ export const joinServer = async (handshakeHash: string, password?: string) => {
 
   logDebug('joinServer', data);
 
-  unsubscribeFromServer = initSubscriptions();
-
   store.dispatch(serverSliceActions.setInitialData(data));
+
+  unsubscribeFromServer = initSubscriptions();
 
   setPluginCommands(data.commands);
 };

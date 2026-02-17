@@ -35,7 +35,7 @@ import type {
 
 const RENDERER_URL = process.env.ELECTRON_RENDERER_URL;
 let mainWindow: BrowserWindow | null = null;
-const PUSH_KEYBIND_RELEASE_TIMEOUT_MS = 400;
+const PUSH_KEYBIND_RELEASE_TIMEOUT_MS = 650;
 
 if (process.platform === "linux") {
   // Required on Wayland compositors for globalShortcut to work while unfocused.

@@ -41,7 +41,22 @@ export default defineConfig([
           argsIgnorePattern: '^_'
         }
       ],
-      'react-refresh/only-export-components': 'warn'
+      'react-refresh/only-export-components': [
+        'warn',
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            'ModViewContext',
+            'ModViewScreen',
+            'useModViewContext',
+            'VolumeControlContext',
+            'useVolumeControl',
+            'badgeVariants',
+            'buttonVariants',
+            'iconButtonVariants'
+          ]
+        }
+      ]
     }
   }
 ]);

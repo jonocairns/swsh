@@ -9,6 +9,10 @@ type TSocketLike = {
   socket?: { remoteAddress?: unknown };
 };
 
+type TGetWsInfoOptions = {
+  trustProxy?: boolean;
+};
+
 const normalizeIpCandidate = (value: unknown): string | undefined => {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value[0];
@@ -18,27 +22,35 @@ const normalizeIpCandidate = (value: unknown): string | undefined => {
 
 const getWsIp = (
   ws: unknown,
-  req: http.IncomingMessage
+  req: http.IncomingMessage,
+  options?: TGetWsInfoOptions
 ): string | undefined => {
   const parsedWs =
     ws && typeof ws === 'object' ? (ws as TSocketLike) : undefined;
 
   const headers = req?.headers || {};
+  const trustProxy = options?.trustProxy === true;
 
-  let ip = normalizeIpCandidate(
-    headers['cf-connecting-ip'] ||
-      headers['cf-real-ip'] ||
-      headers['x-real-ip'] ||
-      headers['x-forwarded-for'] ||
-      headers['x-client-ip'] ||
-      headers['x-cluster-client-ip'] ||
-      headers['forwarded-for'] ||
-      headers['forwarded'] ||
-      parsedWs?._socket?.remoteAddress ||
+  const proxyIp = normalizeIpCandidate(
+    parsedWs?._socket?.remoteAddress ||
       parsedWs?.socket?.remoteAddress ||
       req?.socket?.remoteAddress ||
       req?.connection?.remoteAddress
   );
+
+  let ip = trustProxy
+    ? normalizeIpCandidate(
+        headers['cf-connecting-ip'] ||
+          headers['cf-real-ip'] ||
+          headers['x-real-ip'] ||
+          headers['x-forwarded-for'] ||
+          headers['x-client-ip'] ||
+          headers['x-cluster-client-ip'] ||
+          headers['forwarded-for'] ||
+          headers['forwarded'] ||
+          proxyIp
+      )
+    : proxyIp;
 
   if (!ip) return undefined;
 
@@ -63,9 +75,10 @@ const getWsIp = (
 
 const getWsInfo = (
   ws: unknown,
-  req: http.IncomingMessage
+  req: http.IncomingMessage,
+  options?: TGetWsInfoOptions
 ): TConnectionInfo | undefined => {
-  const ip = getWsIp(ws, req);
+  const ip = getWsIp(ws, req, options);
   const userAgent = req?.headers?.['user-agent'];
 
   if (!ip && !userAgent) return undefined;

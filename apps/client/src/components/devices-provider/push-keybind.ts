@@ -36,6 +36,10 @@ const createDefaultKeybindState = (): TKeybindState => ({
 
 const isModifierCode = (code: string): boolean => MODIFIER_CODES.has(code);
 
+const isModifierToken = (
+  token: string
+): token is keyof typeof MODIFIER_CODE_MAP => token in MODIFIER_CODE_MAP;
+
 const serializePushKeybind = ({
   code,
   ctrlKey,
@@ -81,9 +85,8 @@ const normalizePushKeybind = (keybind: string | undefined): string | undefined =
   const parsed = createDefaultKeybindState();
 
   for (const token of tokens) {
-    const modifierKey = MODIFIER_CODE_MAP[token];
-
-    if (modifierKey) {
+    if (isModifierToken(token)) {
+      const modifierKey = MODIFIER_CODE_MAP[token];
       parsed[modifierKey] = true;
       continue;
     }
