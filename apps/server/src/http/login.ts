@@ -1,20 +1,20 @@
 import { ActivityLogType, type TJoinedUser } from '@sharkord/shared';
 import { eq, sql } from 'drizzle-orm';
 import http from 'http';
-import jwt from 'jsonwebtoken';
 import z from 'zod';
 import { config } from '../config';
 import { db } from '../db';
 import { publishUser } from '../db/publishers';
 import { isInviteValid } from '../db/queries/invites';
 import { getDefaultRole } from '../db/queries/roles';
-import { getServerToken, getSettings } from '../db/queries/server';
+import { getSettings } from '../db/queries/server';
 import { getUserByIdentity } from '../db/queries/users';
 import { invites, userRoles, users } from '../db/schema';
 import { getWsInfo } from '../helpers/get-ws-info';
 import { hashPassword, isArgon2Hash, verifyPassword } from '../helpers/password';
 import { enqueueActivityLog } from '../queues/activity-log';
 import { invariant } from '../utils/invariant';
+import { issueAuthTokens } from './auth-tokens';
 import { getJsonBody } from './helpers';
 import { HttpValidationError } from './utils';
 
@@ -136,12 +136,10 @@ const loginRouteHandler = async (
       .run();
   }
 
-  const token = jwt.sign({ userId: existingUser.id }, await getServerToken(), {
-    expiresIn: '86400s' // 1 day
-  });
+  const { token, refreshToken } = await issueAuthTokens(existingUser.id);
 
   res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ success: true, token }));
+  res.end(JSON.stringify({ success: true, token, refreshToken }));
 
   return res;
 };

@@ -4,7 +4,9 @@ use deep_filter::tract::{DfParams, DfTract, ReduceMask, RuntimeParams};
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
+#[cfg(any(windows, test))]
+use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -173,18 +175,24 @@ struct VoiceFilterPushFrameParams {
 
 #[derive(Debug, Clone, Copy)]
 enum CaptureEndReason {
+    #[cfg(windows)]
     CaptureStopped,
+    #[cfg(windows)]
     AppExited,
     CaptureError,
+    #[cfg(windows)]
     DeviceLost,
 }
 
 impl CaptureEndReason {
     fn as_str(self) -> &'static str {
         match self {
+            #[cfg(windows)]
             Self::CaptureStopped => "capture_stopped",
+            #[cfg(windows)]
             Self::AppExited => "app_exited",
             Self::CaptureError => "capture_error",
+            #[cfg(windows)]
             Self::DeviceLost => "device_lost",
         }
     }
@@ -197,6 +205,7 @@ struct CaptureOutcome {
 }
 
 impl CaptureOutcome {
+    #[cfg(windows)]
     fn from_reason(reason: CaptureEndReason) -> Self {
         Self {
             reason,
@@ -219,12 +228,14 @@ struct CaptureSession {
     handle: JoinHandle<()>,
 }
 
+#[cfg(windows)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PushKeybindKind {
     Talk,
     Mute,
 }
 
+#[cfg(windows)]
 impl PushKeybindKind {
     fn as_str(self) -> &'static str {
         match self {
@@ -421,6 +432,7 @@ fn start_frame_writer(stdout: Arc<Mutex<io::Stdout>>, queue: Arc<FrameQueue>) ->
     })
 }
 
+#[cfg(windows)]
 fn enqueue_frame_event(
     queue: &Arc<FrameQueue>,
     session_id: &str,
@@ -514,6 +526,7 @@ fn enqueue_voice_filter_ended_event(
     }
 }
 
+#[cfg(windows)]
 fn enqueue_push_keybind_state_event(queue: &Arc<FrameQueue>, kind: PushKeybindKind, active: bool) {
     let params = json!({
         "kind": kind.as_str(),
@@ -941,6 +954,7 @@ fn parse_target_pid(target_id: &str) -> Option<u32> {
         .and_then(|raw| raw.parse::<u32>().ok())
 }
 
+#[cfg(any(windows, test))]
 fn dedupe_window_entries_by_pid(entries: Vec<(u32, String)>) -> HashMap<u32, String> {
     let mut deduped: HashMap<u32, String> = HashMap::new();
 
@@ -951,6 +965,7 @@ fn dedupe_window_entries_by_pid(entries: Vec<(u32, String)>) -> HashMap<u32, Str
     deduped
 }
 
+#[cfg(any(windows, test))]
 fn parse_window_source_id(source_id: &str) -> Option<isize> {
     let mut parts = source_id.split(':');
 
@@ -1981,9 +1996,12 @@ mod tests {
 
     #[test]
     fn maps_capture_end_reasons() {
-        assert_eq!(CaptureEndReason::CaptureStopped.as_str(), "capture_stopped");
-        assert_eq!(CaptureEndReason::AppExited.as_str(), "app_exited");
         assert_eq!(CaptureEndReason::CaptureError.as_str(), "capture_error");
+        #[cfg(windows)]
+        assert_eq!(CaptureEndReason::CaptureStopped.as_str(), "capture_stopped");
+        #[cfg(windows)]
+        assert_eq!(CaptureEndReason::AppExited.as_str(), "app_exited");
+        #[cfg(windows)]
         assert_eq!(CaptureEndReason::DeviceLost.as_str(), "device_lost");
     }
 }

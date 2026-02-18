@@ -31,7 +31,6 @@
         "@radix-ui/react-tabs": "^1.1.13",
         "@radix-ui/react-tooltip": "^1.2.8",
         "@reduxjs/toolkit": "^2.9.0",
-        "@sapphi-red/web-noise-suppressor": "^0.3.5",
         "@sharkord/shared": "workspace:*",
         "@tailwindcss/vite": "^4.1.13",
         "@tiptap/core": "^3.7.2",
@@ -554,8 +553,6 @@
     "@rollup/rollup-win32-x64-gnu": ["@rollup/rollup-win32-x64-gnu@4.57.1", "", { "os": "win32", "cpu": "x64" }, "sha512-VMBH2eOOaKGtIJYleXsi2B8CPVADrh+TyNxJ4mWPnKfLB/DBUmzW+5m1xUrcwWoMfSLagIRpjUFeW5CO5hyciQ=="],
 
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.57.1", "", { "os": "win32", "cpu": "x64" }, "sha512-mxRFDdHIWRxg3UfIIAwCm6NzvxG0jDX/wBN6KsQFTvKFqqg9vTrWUE68qEjHt19A5wwx5X5aUi2zuZT7YR0jrA=="],
-
-    "@sapphi-red/web-noise-suppressor": ["@sapphi-red/web-noise-suppressor@0.3.5", "", {}, "sha512-jh3+V9yM+zxLriQexoGm0GatoPaJWjs6ypFIbFYwQp+AoUb55eUXrjKtKQyuC5zShzzeAQUl0M5JzqB7SSrsRA=="],
 
     "@sharkord/desktop": ["@sharkord/desktop@workspace:apps/desktop"],
 

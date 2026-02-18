@@ -1,5 +1,6 @@
 import { Dialog } from '@/components/dialogs/dialogs';
 import { logDebug } from '@/helpers/browser-logger';
+import { refreshAccessToken, revokeRefreshToken } from '@/helpers/auth';
 import { getHostFromServer } from '@/helpers/get-file-url';
 import { cleanup, connectToTRPC, getTRPCClient } from '@/lib/trpc';
 import { type TPublicServerSettings, type TServerInfo } from '@sharkord/shared';
@@ -49,18 +50,33 @@ export const connect = async () => {
   const info = infoSelector(state);
   const serverId = info?.serverId ?? 'unknown-server';
 
-  const host = getHostFromServer();
-  const trpc = await connectToTRPC(host);
+  const attemptConnect = async () => {
+    const host = getHostFromServer();
+    const trpc = await connectToTRPC(host);
 
-  const { hasPassword, handshakeHash } = await trpc.others.handshake.query();
+    const { hasPassword, handshakeHash } = await trpc.others.handshake.query();
 
-  if (hasPassword) {
-    // show password prompt
-    openDialog(Dialog.SERVER_PASSWORD, { handshakeHash, serverId });
-    return;
+    if (hasPassword) {
+      // show password prompt
+      openDialog(Dialog.SERVER_PASSWORD, { handshakeHash, serverId });
+      return;
+    }
+
+    await joinServer(handshakeHash);
+  };
+
+  try {
+    await attemptConnect();
+  } catch (error) {
+    const refreshed = await refreshAccessToken();
+
+    if (!refreshed) {
+      throw error;
+    }
+
+    cleanup();
+    await attemptConnect();
   }
-
-  await joinServer(handshakeHash);
 };
 
 export const joinServer = async (handshakeHash: string, password?: string) => {
@@ -78,6 +94,12 @@ export const joinServer = async (handshakeHash: string, password?: string) => {
 
 export const disconnectFromServer = () => {
   cleanup();
+  unsubscribeFromServer?.();
+};
+
+export const logoutFromServer = async () => {
+  await revokeRefreshToken();
+  cleanup({ clearAuth: true });
   unsubscribeFromServer?.();
 };
 

@@ -49,6 +49,7 @@
                 pnpm
                 bun
                 tmux
+                gh
                 rustup
                 mingwCc
               ]

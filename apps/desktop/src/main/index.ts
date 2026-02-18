@@ -7,6 +7,7 @@ import {
   session,
   shell,
 } from "electron";
+import fs from "node:fs";
 import path from "path";
 import { resolveDesktopCaptureCapabilities } from "./capture-capabilities";
 import { captureSidecarManager } from "./capture-sidecar-manager";
@@ -34,6 +35,21 @@ import type {
 const RENDERER_URL = process.env.ELECTRON_RENDERER_URL;
 let mainWindow: BrowserWindow | null = null;
 
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.sharkord.desktop");
+}
+
+const resolveAppIconPath = (): string | undefined => {
+  const iconFile = process.platform === "win32" ? "icon.ico" : "icon.png";
+  const iconPath = path.join(__dirname, "..", "..", "assets", "icons", iconFile);
+
+  if (!fs.existsSync(iconPath)) {
+    return undefined;
+  }
+
+  return iconPath;
+};
+
 const emitPushKeybindEvent = (event: TDesktopPushKeybindEvent) => {
   mainWindow?.webContents.send("desktop:global-push-keybind", event);
 };
@@ -59,6 +75,8 @@ const getEffectiveDesktopCapabilities = async (
 };
 
 const createMainWindow = () => {
+  const icon = resolveAppIconPath();
+
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -67,6 +85,7 @@ const createMainWindow = () => {
     autoHideMenuBar: true,
     show: false,
     backgroundColor: "#090d12",
+    icon,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

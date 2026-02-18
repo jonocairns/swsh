@@ -26,13 +26,16 @@
   "build": {
     "appId": "com.sharkord.desktop",
     "productName": "Sharkord Desktop",
+    "icon": "icons/icon.png",
     "directories": {
-      "output": "build/out"
+      "output": "build/out",
+      "buildResources": "assets"
     },
     "asar": true,
     "files": [
       "dist/**/*",
       "renderer-dist/**/*",
+      "assets/icons/**/*",
       "package.json"
     ],
     "extraResources": [
@@ -51,15 +54,24 @@
       "category": "public.app-category.social-networking"
     },
     "win": {
-      "target": [
-        "dir"
-      ]
+      "target": ["dir"],
+      "executableName": "Sharkord",
+      "icon": "icons/icon.ico"
     },
     "linux": {
       "target": [
         "dir"
       ],
-      "category": "Network"
+      "category": "Network",
+      "icon": "icons/icon.png"
+    },
+    "nsis": {
+      "installerIcon": "icons/icon.ico",
+      "uninstallerIcon": "icons/icon.ico",
+      "installerHeaderIcon": "icons/icon.ico"
+    },
+    "portable": {
+      "artifactName": "Sharkord.exe"
     }
   },
   "devDependencies": {

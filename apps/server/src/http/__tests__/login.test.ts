@@ -2,14 +2,22 @@ import { sha256 } from '@sharkord/shared';
 import { describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
-import { login } from '../../__tests__/helpers';
+import { login, logout, refresh } from '../../__tests__/helpers';
 import { TEST_SECRET_TOKEN } from '../../__tests__/seed';
 import { tdb } from '../../__tests__/setup';
-import { invites, roles, settings, userRoles, users } from '../../db/schema';
+import {
+  invites,
+  refreshTokens,
+  roles,
+  settings,
+  userRoles,
+  users
+} from '../../db/schema';
 
 type TLoginResponse = {
   success?: boolean;
   token: string;
+  refreshToken: string;
   error?: string;
   errors: Record<string, string>;
 };
@@ -24,6 +32,7 @@ describe('/login', () => {
 
     expect(data).toHaveProperty('success', true);
     expect(data).toHaveProperty('token');
+    expect(data).toHaveProperty('refreshToken');
 
     const decoded = jwt.verify(data.token, await sha256(TEST_SECRET_TOKEN));
 
@@ -41,6 +50,50 @@ describe('/login', () => {
     expect(data.errors).toHaveProperty('password', 'Invalid password');
   });
 
+  test('should login with legacy plaintext password and upgrade hash', async () => {
+    await tdb
+      .update(users)
+      .set({ password: 'password123' })
+      .where(eq(users.identity, 'testowner'));
+
+    const response = await login('testowner', 'password123');
+
+    expect(response.status).toBe(200);
+
+    const updatedUser = await tdb
+      .select({ password: users.password })
+      .from(users)
+      .where(eq(users.identity, 'testowner'))
+      .get();
+
+    expect(updatedUser).toBeTruthy();
+    expect(updatedUser?.password.startsWith('argon2$')).toBe(true);
+  });
+
+  test('should login with raw argon2 hash and upgrade to prefixed format', async () => {
+    const rawArgon2Hash = await Bun.password.hash('password123', {
+      algorithm: 'argon2id'
+    });
+
+    await tdb
+      .update(users)
+      .set({ password: rawArgon2Hash })
+      .where(eq(users.identity, 'testowner'));
+
+    const response = await login('testowner', 'password123');
+
+    expect(response.status).toBe(200);
+
+    const updatedUser = await tdb
+      .select({ password: users.password })
+      .from(users)
+      .where(eq(users.identity, 'testowner'))
+      .get();
+
+    expect(updatedUser).toBeTruthy();
+    expect(updatedUser?.password.startsWith('argon2$')).toBe(true);
+  });
+
   test('should auto-register new user when allowNewUsers is true', async () => {
     const response = await login('newuser', 'newpassword123');
 
@@ -50,6 +103,7 @@ describe('/login', () => {
 
     expect(data).toHaveProperty('success', true);
     expect(data).toHaveProperty('token');
+    expect(data).toHaveProperty('refreshToken');
 
     const newUser = await tdb
       .select()
@@ -94,6 +148,7 @@ describe('/login', () => {
 
     expect(data).toHaveProperty('success', true);
     expect(data).toHaveProperty('token');
+    expect(data).toHaveProperty('refreshToken');
 
     const updatedInvite = await tdb
       .select()
@@ -260,6 +315,65 @@ describe('/login', () => {
       .get();
 
     expect(role?.isDefault).toBe(true);
+  });
+
+  test('should rotate refresh token and reject reused token', async () => {
+    const response = await login('testowner', 'password123');
+
+    expect(response.status).toBe(200);
+
+    const loginData = (await response.json()) as TLoginResponse;
+    const firstRefreshToken = loginData.refreshToken;
+
+    const refreshResponse = await refresh(firstRefreshToken);
+
+    expect(refreshResponse.status).toBe(200);
+
+    const refreshData = (await refreshResponse.json()) as TLoginResponse;
+
+    expect(refreshData).toHaveProperty('token');
+    expect(refreshData).toHaveProperty('refreshToken');
+    expect(refreshData.refreshToken).not.toBe(firstRefreshToken);
+
+    const reusedResponse = await refresh(firstRefreshToken);
+
+    expect(reusedResponse.status).toBe(401);
+
+    const latestRefreshResponse = await refresh(refreshData.refreshToken);
+
+    expect(latestRefreshResponse.status).toBe(200);
+
+    const sessions = await tdb.select().from(refreshTokens);
+    const revokedSessions = sessions.filter((session) => !!session.revokedAt);
+
+    expect(revokedSessions.length).toBeGreaterThan(0);
+  });
+
+  test('should return 401 for invalid refresh token', async () => {
+    const response = await refresh('invalid-refresh-token');
+
+    expect(response.status).toBe(401);
+
+    const data = await response.json();
+
+    expect(data).toHaveProperty('error', 'Invalid refresh token');
+  });
+
+  test('should revoke refresh token on logout', async () => {
+    const response = await login('testowner', 'password123');
+
+    expect(response.status).toBe(200);
+
+    const loginData = (await response.json()) as TLoginResponse;
+    const refreshToken = loginData.refreshToken;
+
+    const logoutResponse = await logout(refreshToken);
+
+    expect(logoutResponse.status).toBe(200);
+
+    const refreshResponse = await refresh(refreshToken);
+
+    expect(refreshResponse.status).toBe(401);
   });
 
   test('should rate limit excessive login attempts', async () => {

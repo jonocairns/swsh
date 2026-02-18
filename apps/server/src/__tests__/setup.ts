@@ -51,12 +51,43 @@ let tdb: BunSQLiteDatabase;
 let sqlite: Database | null = null;
 let testsBaseUrl: string;
 
+type TErrorEmitter = {
+  once?: (event: 'error', listener: (...args: unknown[]) => void) => void;
+  on?: (event: 'error', listener: (...args: unknown[]) => void) => void;
+};
+
+const onErrorOnce = (
+  emitter: unknown,
+  listener: (...args: unknown[]) => void
+) => {
+  if (!emitter || (typeof emitter !== 'object' && typeof emitter !== 'function'))
+    return;
+
+  const typedEmitter = emitter as TErrorEmitter;
+
+  if (typeof typedEmitter.once === 'function') {
+    typedEmitter.once('error', listener);
+    return;
+  }
+
+  if (typeof typedEmitter.on === 'function') {
+    let called = false;
+
+    typedEmitter.on('error', (...args) => {
+      if (called) return;
+
+      called = true;
+      listener(...args);
+    });
+  }
+};
+
 const isWebRtcPortAvailable = (port: number): Promise<boolean> =>
   new Promise((resolve) => {
     const tcpServer = createTcpServer();
     tcpServer.unref();
 
-    tcpServer.once('error', () => {
+    onErrorOnce(tcpServer, () => {
       resolve(false);
     });
 
@@ -64,7 +95,7 @@ const isWebRtcPortAvailable = (port: number): Promise<boolean> =>
       const udpSocket = createSocket('udp4');
       udpSocket.unref();
 
-      udpSocket.once('error', () => {
+      onErrorOnce(udpSocket, () => {
         udpSocket.close();
         tcpServer.close(() => resolve(false));
       });
