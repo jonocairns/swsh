@@ -35,10 +35,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Rust sidecar
-        working-directory: apps/desktop/sidecar
-        run: cargo build --release
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Run Rust sidecar tests
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/sidecar -> target
+
+      - name: Build and test Rust sidecar
         working-directory: apps/desktop/sidecar
-        run: cargo test
+        run: cargo test --release --locked

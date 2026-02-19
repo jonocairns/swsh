@@ -51,6 +51,14 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/sidecar -> target
+
       - name: Build client renderer
         working-directory: apps/client
         run: bun run build
