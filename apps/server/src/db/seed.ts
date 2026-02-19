@@ -17,7 +17,6 @@ import {
 } from '@sharkord/shared';
 import { randomUUIDv7 } from 'bun';
 import chalk from 'chalk';
-import { eq } from 'drizzle-orm';
 import { hashPassword } from '../helpers/password';
 import { logger } from '../logger';
 import { IS_DEVELOPMENT } from '../utils/env';
@@ -27,7 +26,6 @@ import {
   channels,
   messages,
   rolePermissions,
-  roles,
   settings,
   userRoles,
   users
@@ -207,26 +205,4 @@ const seedDatabase = async () => {
   console.log('\n%s\n', notice);
 };
 
-const backfillDefaultRolePermissions = async () => {
-  const defaultRoles = await db
-    .select({ id: roles.id })
-    .from(roles)
-    .where(eq(roles.isDefault, true));
-
-  if (defaultRoles.length === 0) return;
-
-  const now = Date.now();
-
-  await db
-    .insert(rolePermissions)
-    .values(
-      defaultRoles.map(({ id }) => ({
-        roleId: id,
-        permission: Permission.REACT_TO_MESSAGES,
-        createdAt: now
-      }))
-    )
-    .onConflictDoNothing();
-};
-
-export { backfillDefaultRolePermissions, seedDatabase };
+export { seedDatabase };
