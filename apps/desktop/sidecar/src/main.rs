@@ -283,6 +283,12 @@ struct DeepFilterProcessor {
     output_buffers: Vec<VecDeque<f32>>,
 }
 
+// SAFETY: `DeepFilterProcessor` is never accessed concurrently. It is always
+// stored inside `SidecarState`, which is guarded by `Mutex<SidecarState>`.
+// This guarantees serialized access when the state is touched from different
+// threads (command loop and binary-ingress worker).
+unsafe impl Send for DeepFilterProcessor {}
+
 struct AutoGainControlState {
     current_gain: f32,
 }

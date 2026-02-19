@@ -17,7 +17,7 @@ import type {
   TVoiceFilterPcmFrame,
   TVoiceFilterSession,
   TVoiceFilterStatusEvent,
-} from "./types";
+} from "./types.js";
 
 type TSidecarResponse = {
   id: string;
@@ -63,6 +63,9 @@ const SIDECAR_BINARY_NAME =
 const BINARY_VOICE_FILTER_INGRESS_HOST = "127.0.0.1";
 const BINARY_VOICE_FILTER_CONNECT_TIMEOUT_MS = 1_000;
 const MAX_BINARY_VOICE_FILTER_FRAME_SIZE_BYTES = 4 * 1024 * 1024;
+const MAX_BINARY_VOICE_FILTER_INGRESS_QUEUE_PACKETS = 24;
+const MAX_BINARY_VOICE_FILTER_INGRESS_QUEUE_BYTES = 512 * 1024;
+const BINARY_VOICE_FILTER_INGRESS_DROP_LOG_INTERVAL = 25;
 
 const runtimeRequire: NodeJS.Require | undefined =
   typeof require === "function" ? require : undefined;
@@ -120,6 +123,12 @@ class CaptureSidecarManager {
   private voiceFilterBinarySocket: Socket | undefined;
   private voiceFilterBinaryConnectPromise: Promise<void> | undefined;
   private nextVoiceFilterBinaryRetryAt = 0;
+  private voiceFilterBinaryWriteBlocked = false;
+  private voiceFilterBinaryPendingPackets: Buffer[] = [];
+  private voiceFilterBinaryPendingBytes = 0;
+  private voiceFilterBinaryDroppedPackets = 0;
+  private voiceFilterBinaryDroppedBytes = 0;
+  private nextVoiceFilterBinaryDropLogAt = BINARY_VOICE_FILTER_INGRESS_DROP_LOG_INTERVAL;
   private readonly events = new EventEmitter();
   private readonly restartDelayMs: number;
   private readonly resolveBinaryPathOverride: (() => string | undefined) | undefined;
@@ -411,12 +420,14 @@ class CaptureSidecarManager {
       console.info("[capture-sidecar]", chunk.trim());
     });
 
-    processRef.on("exit", (code, signal) => {
+    const processEvents = processRef as unknown as NodeJS.EventEmitter;
+
+    processEvents.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
       const reason = `Capture sidecar exited (code=${code ?? "null"}, signal=${signal ?? "null"})`;
       this.handleSidecarExit(reason);
     });
 
-    processRef.on("error", (error) => {
+    processEvents.on("error", (error: Error) => {
       this.handleSidecarExit(`Capture sidecar error: ${error.message}`);
     });
   }
@@ -580,6 +591,10 @@ class CaptureSidecarManager {
 
       if (parsedLine.event === "push_keybind.state") {
         const pushEvent = parsedLine.params as TDesktopPushKeybindEvent;
+        if (pushEvent.kind !== "talk" && pushEvent.kind !== "mute") {
+          return;
+        }
+
         this.pushKeybindActiveState[pushEvent.kind] = pushEvent.active;
         this.events.emit("push-keybind", pushEvent);
       }
@@ -606,6 +621,8 @@ class CaptureSidecarManager {
   }
 
   private closeVoiceFilterBinarySocket() {
+    this.resetVoiceFilterBinaryBackpressureState();
+
     if (!this.voiceFilterBinarySocket) {
       return;
     }
@@ -613,6 +630,136 @@ class CaptureSidecarManager {
     this.voiceFilterBinarySocket.removeAllListeners();
     this.voiceFilterBinarySocket.destroy();
     this.voiceFilterBinarySocket = undefined;
+  }
+
+  private resetVoiceFilterBinaryBackpressureState() {
+    this.voiceFilterBinaryWriteBlocked = false;
+    this.voiceFilterBinaryPendingPackets = [];
+    this.voiceFilterBinaryPendingBytes = 0;
+    this.voiceFilterBinaryDroppedPackets = 0;
+    this.voiceFilterBinaryDroppedBytes = 0;
+    this.nextVoiceFilterBinaryDropLogAt = BINARY_VOICE_FILTER_INGRESS_DROP_LOG_INTERVAL;
+  }
+
+  private recordVoiceFilterBinaryQueueDrops(droppedPackets: number, droppedBytes: number) {
+    if (droppedPackets <= 0 || droppedBytes < 0) {
+      return;
+    }
+
+    this.voiceFilterBinaryDroppedPackets += droppedPackets;
+    this.voiceFilterBinaryDroppedBytes += droppedBytes;
+
+    if (this.voiceFilterBinaryDroppedPackets < this.nextVoiceFilterBinaryDropLogAt) {
+      return;
+    }
+
+    console.warn("[desktop] Dropping queued binary ingress packets to limit latency", {
+      droppedPackets: this.voiceFilterBinaryDroppedPackets,
+      droppedBytes: this.voiceFilterBinaryDroppedBytes,
+      queuedPackets: this.voiceFilterBinaryPendingPackets.length,
+      queuedBytes: this.voiceFilterBinaryPendingBytes,
+      policy: "drop_oldest",
+    });
+
+    this.nextVoiceFilterBinaryDropLogAt =
+      this.voiceFilterBinaryDroppedPackets + BINARY_VOICE_FILTER_INGRESS_DROP_LOG_INTERVAL;
+  }
+
+  private enqueueVoiceFilterBinaryPacket(packet: Buffer) {
+    if (packet.length <= 0) {
+      return;
+    }
+
+    if (packet.length > MAX_BINARY_VOICE_FILTER_INGRESS_QUEUE_BYTES) {
+      this.recordVoiceFilterBinaryQueueDrops(1, packet.length);
+      return;
+    }
+
+    let droppedPackets = 0;
+    let droppedBytes = 0;
+
+    while (
+      this.voiceFilterBinaryPendingPackets.length >= MAX_BINARY_VOICE_FILTER_INGRESS_QUEUE_PACKETS ||
+      this.voiceFilterBinaryPendingBytes + packet.length >
+        MAX_BINARY_VOICE_FILTER_INGRESS_QUEUE_BYTES
+    ) {
+      const droppedPacket = this.voiceFilterBinaryPendingPackets.shift();
+      if (!droppedPacket) {
+        break;
+      }
+
+      this.voiceFilterBinaryPendingBytes = Math.max(
+        0,
+        this.voiceFilterBinaryPendingBytes - droppedPacket.length,
+      );
+      droppedPackets += 1;
+      droppedBytes += droppedPacket.length;
+    }
+
+    this.voiceFilterBinaryPendingPackets.push(packet);
+    this.voiceFilterBinaryPendingBytes += packet.length;
+    this.recordVoiceFilterBinaryQueueDrops(droppedPackets, droppedBytes);
+  }
+
+  private flushVoiceFilterBinaryQueue(socket: Socket) {
+    if (socket !== this.voiceFilterBinarySocket || socket.destroyed || !socket.writable) {
+      return;
+    }
+
+    if (this.voiceFilterBinaryPendingPackets.length === 0) {
+      this.voiceFilterBinaryWriteBlocked = false;
+      return;
+    }
+
+    while (this.voiceFilterBinaryPendingPackets.length > 0) {
+      const packet = this.voiceFilterBinaryPendingPackets.shift();
+      if (!packet) {
+        break;
+      }
+
+      this.voiceFilterBinaryPendingBytes = Math.max(
+        0,
+        this.voiceFilterBinaryPendingBytes - packet.length,
+      );
+
+      try {
+        const accepted = socket.write(packet);
+        if (!accepted) {
+          this.voiceFilterBinaryWriteBlocked = true;
+          return;
+        }
+      } catch {
+        this.closeVoiceFilterBinarySocket();
+        return;
+      }
+    }
+
+    this.voiceFilterBinaryWriteBlocked = false;
+  }
+
+  private writeVoiceFilterBinaryPacket(socket: Socket, packet: Buffer): boolean {
+    if (socket !== this.voiceFilterBinarySocket || socket.destroyed || !socket.writable) {
+      return false;
+    }
+
+    if (this.voiceFilterBinaryWriteBlocked || this.voiceFilterBinaryPendingPackets.length > 0) {
+      this.enqueueVoiceFilterBinaryPacket(packet);
+      if (!this.voiceFilterBinaryWriteBlocked) {
+        this.flushVoiceFilterBinaryQueue(socket);
+      }
+      return true;
+    }
+
+    try {
+      const accepted = socket.write(packet);
+      if (!accepted) {
+        this.voiceFilterBinaryWriteBlocked = true;
+      }
+      return true;
+    } catch {
+      this.closeVoiceFilterBinarySocket();
+      return false;
+    }
   }
 
   private async ensureVoiceFilterBinaryIngress(): Promise<void> {
@@ -668,9 +815,13 @@ class CaptureSidecarManager {
             console.warn("[desktop] Binary voice filter ingress socket error", error);
             this.closeVoiceFilterBinarySocket();
           });
+          socket.on("drain", () => {
+            this.flushVoiceFilterBinaryQueue(socket);
+          });
           socket.on("close", () => {
             if (this.voiceFilterBinarySocket === socket) {
               this.voiceFilterBinarySocket = undefined;
+              this.resetVoiceFilterBinaryBackpressureState();
             }
           });
 
@@ -781,13 +932,7 @@ class CaptureSidecarManager {
     offset += 4;
     pcmBytes.copy(packet, offset);
 
-    try {
-      socket.write(packet);
-      return true;
-    } catch {
-      this.closeVoiceFilterBinarySocket();
-      return false;
-    }
+    return this.writeVoiceFilterBinaryPacket(socket, packet);
   }
 
   private async sendRequestInternal(method: string, params: unknown) {
