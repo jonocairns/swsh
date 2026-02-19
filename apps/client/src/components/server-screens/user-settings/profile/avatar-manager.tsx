@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button';
-import { Group } from '@/components/ui/group';
 import { UserAvatar } from '@/components/user-avatar';
 import { uploadFile } from '@/helpers/upload-file';
 import { useFilePicker } from '@/hooks/use-file-picker';
@@ -50,33 +49,40 @@ const AvatarManager = memo(({ user }: TAvatarManagerProps) => {
   }, [openFilePicker]);
 
   return (
-    <Group label="Avatar">
-      <div className="space-y-2">
-        <div
-          className="relative group cursor-pointer w-32 h-32"
+    <div className="space-y-3">
+      <div className="space-y-1 md:min-h-16">
+        <p className="text-sm font-medium">Avatar</p>
+        <p className="text-xs text-muted-foreground">
+          Upload a new avatar image.
+        </p>
+      </div>
+
+      <div className="flex flex-col items-start gap-3">
+        <button
+          type="button"
+          className="relative group h-24 w-24 cursor-pointer overflow-hidden rounded-full"
           onClick={onAvatarClick}
         >
           <UserAvatar
             userId={user.id}
-            className="h-32 w-32 rounded-full bg-muted transition-opacity group-hover:opacity-30"
+            className="h-24 w-24 rounded-full bg-muted transition-opacity group-hover:opacity-30"
             showStatusBadge={false}
             showUserPopover={false}
           />
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-            <div className="bg-black/50 rounded-full p-3">
-              <Upload className="h-6 w-6 text-white" />
+            <div className="bg-black/50 rounded-full p-2">
+              <Upload className="h-4 w-4 text-white" />
             </div>
           </div>
-        </div>
-      </div>
-      {user.avatarId && (
-        <div>
+        </button>
+
+        {user.avatarId && (
           <Button size="sm" variant="outline" onClick={removeAvatar}>
             Remove avatar
           </Button>
-        </div>
-      )}
-    </Group>
+        )}
+      </div>
+    </div>
   );
 });
 

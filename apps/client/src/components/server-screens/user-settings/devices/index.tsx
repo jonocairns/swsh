@@ -8,13 +8,12 @@ import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
+  CardFooter,
 } from '@/components/ui/card';
-import { Group } from '@/components/ui/group';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { LoadingCard } from '@/components/ui/loading-card';
+import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -165,13 +164,7 @@ const Devices = memo(() => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Devices</CardTitle>
-        <CardDescription>
-          Manage your peripheral devices and their settings.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {currentVoiceChannelId && (
           <Alert variant="default">
             <Info />
@@ -181,57 +174,73 @@ const Devices = memo(() => {
             </AlertDescription>
           </Alert>
         )}
-        <Group label="Microphone">
-          <Select
-            onValueChange={(value) => onChange('microphoneId', value)}
-            value={values.microphoneId}
-          >
-            <SelectTrigger className="w-[500px]">
-              <SelectValue placeholder="Select the input device" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {inputDevices.map((device) => (
-                  <SelectItem
-                    key={device?.deviceId}
-                    value={device?.deviceId || DEFAULT_NAME}
-                  >
-                    {device?.label.trim() || 'Default Microphone'}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold">Microphone</h3>
+            <p className="text-sm text-muted-foreground">
+              Configure your input source, processing, and push-to-talk controls.
+            </p>
+          </div>
 
-          <div className="flex gap-8">
-            <Group label="Echo cancellation">
+          <div className="max-w-2xl space-y-2">
+            <Label>Input device</Label>
+            <Select
+              onValueChange={(value) => onChange('microphoneId', value)}
+              value={values.microphoneId}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select the input device" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {inputDevices.map((device) => (
+                    <SelectItem
+                      key={device?.deviceId}
+                      value={device?.deviceId || DEFAULT_NAME}
+                    >
+                      {device?.label.trim() || 'Default Microphone'}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label className="cursor-default">Echo cancellation</Label>
               <Switch
                 checked={!!values.echoCancellation}
                 onCheckedChange={(checked) =>
                   onChange('echoCancellation', checked)
                 }
               />
-            </Group>
+            </div>
 
-            <Group label="Noise suppression">
+            <div className="flex items-center justify-between gap-3">
+              <Label className="cursor-default">Noise suppression</Label>
               <Switch
                 checked={!!values.noiseSuppression}
                 onCheckedChange={(checked) =>
                   onChange('noiseSuppression', checked)
                 }
               />
-            </Group>
+            </div>
 
-            <Group label="Automatic gain control">
+            <div className="flex items-center justify-between gap-3">
+              <Label className="cursor-default">Automatic gain control</Label>
               <Switch
                 checked={!!values.autoGainControl}
                 onCheckedChange={(checked) =>
                   onChange('autoGainControl', checked)
                 }
               />
-            </Group>
+            </div>
 
-            <Group label="DeepFilterNet filter (Desktop)">
+            <div className="flex items-center justify-between gap-3">
+              <Label className="cursor-default">
+                Background noise filter (Desktop)
+              </Label>
               <Switch
                 checked={!!values.experimentalVoiceFilter}
                 onCheckedChange={(checked) =>
@@ -239,14 +248,17 @@ const Devices = memo(() => {
                 }
                 disabled={!hasDesktopBridge}
               />
-            </Group>
+            </div>
           </div>
+
           <p className="text-xs text-muted-foreground">
-            Uses desktop sidecar DeepFilterNet suppression. Higher strength
-            reduces more background noise but may affect voice quality. This
+            Uses desktop AI noise reduction (DeepFilterNet). Higher strength
+            removes more background noise but may affect voice quality. This
             filter is available in the desktop app.
           </p>
-          <Group label="Voice filter strength">
+
+          <div className="max-w-sm space-y-2">
+            <Label>Voice filter strength</Label>
             <Select
               onValueChange={(value) =>
                 onChange('voiceFilterStrength', value as VoiceFilterStrength)
@@ -254,7 +266,7 @@ const Devices = memo(() => {
               value={values.voiceFilterStrength}
               disabled={!hasDesktopBridge || !values.experimentalVoiceFilter}
             >
-              <SelectTrigger className="w-[240px]">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a filter preset" />
               </SelectTrigger>
               <SelectContent>
@@ -270,16 +282,24 @@ const Devices = memo(() => {
                 </SelectGroup>
               </SelectContent>
             </Select>
-          </Group>
+          </div>
+
           {hasDesktopBridge && (
-            <Group label="Push keybinds (Desktop)">
-              <div className="w-[500px] space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-28 text-sm">Push to talk</span>
+            <div className="max-w-2xl space-y-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Push keybinds (Desktop)</p>
+                <p className="text-xs text-muted-foreground">
+                  Hold the configured key to temporarily unmute (push to talk) or
+                  mute (push to mute). Press Escape while capturing to cancel.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <span className="text-sm sm:w-28">Push to talk</span>
                   <Button
                     variant="outline"
                     type="button"
-                    className="min-w-[220px] justify-start font-mono"
+                    className="w-full justify-start font-mono sm:w-[260px]"
                     data-push-keybind-capture={
                       capturingKeybindField === 'pushToTalkKeybind'
                         ? 'true'
@@ -296,16 +316,18 @@ const Devices = memo(() => {
                     type="button"
                     onClick={() => clearPushKeybind('pushToTalkKeybind')}
                     disabled={!values.pushToTalkKeybind}
+                    className="sm:ml-auto"
                   >
                     Clear
                   </Button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-28 text-sm">Push to mute</span>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <span className="text-sm sm:w-28">Push to mute</span>
                   <Button
                     variant="outline"
                     type="button"
-                    className="min-w-[220px] justify-start font-mono"
+                    className="w-full justify-start font-mono sm:w-[260px]"
                     data-push-keybind-capture={
                       capturingKeybindField === 'pushToMuteKeybind'
                         ? 'true'
@@ -322,67 +344,90 @@ const Devices = memo(() => {
                     type="button"
                     onClick={() => clearPushKeybind('pushToMuteKeybind')}
                     disabled={!values.pushToMuteKeybind}
+                    className="sm:ml-auto"
                   >
                     Clear
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Hold the configured key to temporarily unmute (push to talk) or
-                  mute (push to mute). Press Escape while capturing to cancel.
-                </p>
               </div>
-            </Group>
+            </div>
           )}
-        </Group>
+        </section>
 
-        <Group label="Webcam">
-          <Select
-            onValueChange={(value) => onChange('webcamId', value)}
-            value={values.webcamId}
-          >
-            <SelectTrigger className="w-[500px]">
-              <SelectValue placeholder="Select the input device" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {videoDevices.map((device) => (
-                  <SelectItem
-                    key={device?.deviceId}
-                    value={device?.deviceId || DEFAULT_NAME}
-                  >
-                    {device?.label.trim() || 'Default Webcam'}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+        <Separator />
 
-          <ResolutionFpsControl
-            framerate={values.webcamFramerate}
-            resolution={values.webcamResolution}
-            onFramerateChange={(value) => onChange('webcamFramerate', value)}
-            onResolutionChange={(value) =>
-              onChange('webcamResolution', value as Resolution)
-            }
-          />
-          <Group label="Mirror own video">
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold">Webcam</h3>
+            <p className="text-sm text-muted-foreground">
+              Choose the camera and default video quality settings.
+            </p>
+          </div>
+
+          <div className="max-w-2xl space-y-2">
+            <Label>Input device</Label>
+            <Select
+              onValueChange={(value) => onChange('webcamId', value)}
+              value={values.webcamId}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select the input device" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {videoDevices.map((device) => (
+                    <SelectItem
+                      key={device?.deviceId}
+                      value={device?.deviceId || DEFAULT_NAME}
+                    >
+                      {device?.label.trim() || 'Default Webcam'}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="max-w-md">
+            <ResolutionFpsControl
+              framerate={values.webcamFramerate}
+              resolution={values.webcamResolution}
+              onFramerateChange={(value) => onChange('webcamFramerate', value)}
+              onResolutionChange={(value) =>
+                onChange('webcamResolution', value as Resolution)
+              }
+            />
+          </div>
+
+          <div className="flex max-w-md items-center justify-between gap-3">
+            <Label className="cursor-default">Mirror own video</Label>
             <Switch
               checked={!!values.mirrorOwnVideo}
               onCheckedChange={(checked) => onChange('mirrorOwnVideo', checked)}
             />
-          </Group>
-        </Group>
+          </div>
+        </section>
 
-        <Group label="Screen Sharing">
-          <Group label="Video Codec (Webcam + Screen Share)">
+        <Separator />
+
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold">Screen Sharing</h3>
+            <p className="text-sm text-muted-foreground">
+              Control screen share codec, audio capture mode, and quality.
+            </p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-2">
+              <Label>Video codec (Webcam + Screen Share)</Label>
               <Select
                 onValueChange={(value) =>
                   onChange('videoCodec', value as VideoCodecPreference)
                 }
                 value={values.videoCodec}
               >
-                <SelectTrigger className="w-[250px]">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select the video codec" />
                 </SelectTrigger>
                 <SelectContent>
@@ -401,57 +446,72 @@ const Devices = memo(() => {
                 which case Sharkord automatically falls back.
               </p>
             </div>
-          </Group>
 
-          <Group label="Audio Mode">
-            <Select
-              onValueChange={(value) =>
-                onChange('screenAudioMode', value as ScreenAudioMode)
+            <div className="space-y-2">
+              <Label>Audio mode</Label>
+              <Select
+                onValueChange={(value) =>
+                  onChange('screenAudioMode', value as ScreenAudioMode)
+                }
+                value={values.screenAudioMode}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select the audio mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={ScreenAudioMode.SYSTEM}>
+                      System audio
+                    </SelectItem>
+                    <SelectItem value={ScreenAudioMode.APP}>
+                      Per-app audio
+                    </SelectItem>
+                    <SelectItem value={ScreenAudioMode.NONE}>
+                      No shared audio
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="max-w-md">
+            <ResolutionFpsControl
+              framerate={values.screenFramerate}
+              resolution={values.screenResolution}
+              onFramerateChange={(value) => onChange('screenFramerate', value)}
+              onResolutionChange={(value) =>
+                onChange('screenResolution', value as Resolution)
               }
-              value={values.screenAudioMode}
-            >
-              <SelectTrigger className="w-[250px]">
-                <SelectValue placeholder="Select the audio mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={ScreenAudioMode.SYSTEM}>
-                    System audio
-                  </SelectItem>
-                  <SelectItem value={ScreenAudioMode.APP}>
-                    Per-app audio
-                  </SelectItem>
-                  <SelectItem value={ScreenAudioMode.NONE}>
-                    No shared audio
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Group>
+            />
+          </div>
 
-          <ResolutionFpsControl
-            framerate={values.screenFramerate}
-            resolution={values.screenResolution}
-            onFramerateChange={(value) => onChange('screenFramerate', value)}
-            onResolutionChange={(value) =>
-              onChange('screenResolution', value as Resolution)
-            }
-          />
-
-          {window.sharkordDesktop && (
-            <Group label="Use Rust sidecar capture (Experimental)">
+          {hasDesktopBridge && (
+            <div className="flex max-w-md items-center justify-between gap-3">
+              <Label className="cursor-default">
+                Use Rust sidecar capture (Experimental)
+              </Label>
               <Switch
                 checked={!!values.experimentalRustCapture}
                 onCheckedChange={(checked) =>
                   onChange('experimentalRustCapture', checked)
                 }
               />
-            </Group>
+            </div>
           )}
-        </Group>
-        {window.sharkordDesktop && (
-          <Group label="Desktop Server URL">
-            <div className="flex w-[500px] gap-2">
+        </section>
+
+        {hasDesktopBridge && <Separator />}
+
+        {hasDesktopBridge && (
+          <section className="space-y-3">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold">Desktop Server URL</h3>
+              <p className="text-sm text-muted-foreground">
+                Set the URL used by the desktop bridge.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 value={desktopServerUrl}
                 onChange={(event) => setDesktopServerUrl(event.target.value)}
@@ -462,19 +522,21 @@ const Devices = memo(() => {
                 variant="outline"
                 onClick={saveDesktopServerUrl}
                 disabled={!desktopServerUrl.trim() || savingServerUrl}
+                className="sm:w-auto"
               >
                 Save URL
               </Button>
             </div>
-          </Group>
+          </section>
         )}
-        <div className="flex justify-end gap-2 pt-4">
-          <Button variant="outline" onClick={closeServerScreens}>
-            Cancel
-          </Button>
-          <Button onClick={saveDeviceSettings}>Save Changes</Button>
-        </div>
+
       </CardContent>
+      <CardFooter className="border-t items-stretch justify-end gap-2 sm:items-center">
+        <Button variant="outline" onClick={closeServerScreens}>
+          Cancel
+        </Button>
+        <Button onClick={saveDeviceSettings}>Save Changes</Button>
+      </CardFooter>
     </Card>
   );
 });
