@@ -3,7 +3,7 @@ name: Release Desktop (Windows)
 on:
   release:
     types:
-      - created
+      - published
   workflow_dispatch:
     inputs:
       tag:
