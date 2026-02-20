@@ -730,8 +730,16 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
               sessionId: appAudioSession.sessionId,
               targetId: appAudioSession.targetId
             });
-            const appAudioPipeline =
-              await createDesktopAppAudioPipeline(appAudioSession);
+            const appAudioPipeline = await createDesktopAppAudioPipeline(
+              appAudioSession,
+              {
+                mode: 'stable',
+                logLabel: 'per-app-audio',
+                insertSilenceOnDroppedFrames: true,
+                emitQueueTelemetry: true,
+                queueTelemetryIntervalMs: 1_000
+              }
+            );
             let hasReceivedSessionFrame = false;
 
             appAudioSessionRef.current = appAudioSession;

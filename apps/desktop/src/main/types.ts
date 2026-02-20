@@ -81,6 +81,18 @@ export type TAppAudioFrame = {
   droppedFrameCount?: number;
 };
 
+export type TAppAudioPcmFrame = {
+  sessionId: string;
+  targetId: string;
+  sequence: number;
+  sampleRate: number;
+  channels: number;
+  frameCount: number;
+  pcm: Float32Array;
+  protocolVersion: number;
+  droppedFrameCount?: number;
+};
+
 export type TAppAudioEndReason =
   | "capture_stopped"
   | "app_exited"

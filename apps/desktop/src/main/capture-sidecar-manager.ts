@@ -5,6 +5,7 @@ import { createConnection, type Socket } from "node:net";
 import path from "node:path";
 import type {
   TAppAudioFrame,
+  TAppAudioPcmFrame,
   TAppAudioSession,
   TAppAudioStatusEvent,
   TDesktopAppAudioTargetsResult,
@@ -106,6 +107,57 @@ const isSidecarEvent = (value: unknown): value is TSidecarEvent => {
   return "event" in value;
 };
 
+const toPcmAppAudioFrame = (
+  frame: TAppAudioFrame,
+): TAppAudioPcmFrame | undefined => {
+  if (frame.encoding !== "f32le_base64") {
+    return undefined;
+  }
+
+  const pcmBytes = Buffer.from(frame.pcmBase64, "base64");
+  if (pcmBytes.length === 0) {
+    return undefined;
+  }
+
+  if (pcmBytes.length % Float32Array.BYTES_PER_ELEMENT !== 0) {
+    console.warn("[desktop] Dropping malformed app audio frame with invalid PCM byte length", {
+      sessionId: frame.sessionId,
+      sequence: frame.sequence,
+      pcmByteLength: pcmBytes.length,
+    });
+    return undefined;
+  }
+
+  const expectedBytes =
+    frame.frameCount * frame.channels * Float32Array.BYTES_PER_ELEMENT;
+  if (expectedBytes !== pcmBytes.length) {
+    console.warn("[desktop] Dropping malformed app audio frame with mismatched sample count", {
+      sessionId: frame.sessionId,
+      sequence: frame.sequence,
+      expectedBytes,
+      actualBytes: pcmBytes.length,
+    });
+    return undefined;
+  }
+
+  const pcmBuffer = pcmBytes.buffer.slice(
+    pcmBytes.byteOffset,
+    pcmBytes.byteOffset + pcmBytes.byteLength,
+  );
+
+  return {
+    sessionId: frame.sessionId,
+    targetId: frame.targetId,
+    sequence: frame.sequence,
+    sampleRate: frame.sampleRate,
+    channels: frame.channels,
+    frameCount: frame.frameCount,
+    pcm: new Float32Array(pcmBuffer),
+    protocolVersion: frame.protocolVersion,
+    droppedFrameCount: frame.droppedFrameCount,
+  };
+};
+
 class CaptureSidecarManager {
   private sidecarProcess: ChildProcessWithoutNullStreams | undefined;
   private stdoutBuffer = "";
@@ -146,6 +198,13 @@ class CaptureSidecarManager {
     this.events.on("frame", listener);
     return () => {
       this.events.off("frame", listener);
+    };
+  }
+
+  onPcmFrame(listener: (frame: TAppAudioPcmFrame) => void) {
+    this.events.on("frame-pcm", listener);
+    return () => {
+      this.events.off("frame-pcm", listener);
     };
   }
 
@@ -558,7 +617,14 @@ class CaptureSidecarManager {
 
     if (isSidecarEvent(parsedLine)) {
       if (parsedLine.event === "audio_capture.frame") {
-        this.events.emit("frame", parsedLine.params as TAppAudioFrame);
+        const frame = parsedLine.params as TAppAudioFrame;
+        this.events.emit("frame", frame);
+
+        const pcmFrame = toPcmAppAudioFrame(frame);
+        if (pcmFrame) {
+          this.events.emit("frame-pcm", pcmFrame);
+        }
+
         return;
       }
 
@@ -992,5 +1058,5 @@ class CaptureSidecarManager {
 
 const captureSidecarManager = new CaptureSidecarManager();
 
-export { CaptureSidecarManager, captureSidecarManager };
+export { CaptureSidecarManager, captureSidecarManager, toPcmAppAudioFrame };
 export type { TCaptureSidecarManagerOptions };

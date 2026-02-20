@@ -26,6 +26,7 @@ import {
 import { getServerUrl, setServerUrl } from "./settings-store";
 import { desktopUpdater } from "./updater";
 import type {
+  TAppAudioPcmFrame,
   TDesktopPushKeybindEvent,
   TDesktopPushKeybindsInput,
   TGlobalPushKeybindRegistrationResult,
@@ -38,6 +39,7 @@ import type {
 
 const RENDERER_URL = process.env.ELECTRON_RENDERER_URL;
 let mainWindow: BrowserWindow | null = null;
+let appAudioFrameEgressPort: MessagePortMain | undefined;
 let voiceFilterFrameIngressPort: MessagePortMain | undefined;
 
 if (process.platform === "win32") {
@@ -187,7 +189,7 @@ const registerIpcHandlers = () => {
 
   ipcMain.handle(
     "desktop:get-capabilities",
-    (_event: IpcMainInvokeEvent) => {
+    () => {
       return getEffectiveDesktopCapabilities();
     },
   );
@@ -237,6 +239,29 @@ const registerIpcHandlers = () => {
       captureSidecarManager.pushVoiceFilterFrame(frame);
     },
   );
+
+  ipcMain.on("desktop:open-app-audio-frame-channel", (event: IpcMainEvent) => {
+    const { port1, port2 } = new MessageChannelMain();
+    if (appAudioFrameEgressPort) {
+      try {
+        appAudioFrameEgressPort.close();
+      } catch {
+        // ignore
+      }
+      appAudioFrameEgressPort.removeAllListeners();
+    }
+
+    appAudioFrameEgressPort = port2;
+    port2.on("close", () => {
+      if (appAudioFrameEgressPort === port2) {
+        appAudioFrameEgressPort = undefined;
+      }
+      port2.removeAllListeners();
+    });
+
+    port2.start();
+    event.sender.postMessage("desktop:app-audio-frame-channel-ready", null, [port1]);
+  });
 
   ipcMain.on("desktop:open-voice-filter-frame-channel", (event: IpcMainEvent) => {
     const { port1, port2 } = new MessageChannelMain();
@@ -401,7 +426,43 @@ void app
   .whenReady()
   .then(() => {
     captureSidecarManager.onFrame((frame) => {
+      if (appAudioFrameEgressPort) {
+        return;
+      }
+
       mainWindow?.webContents.send("desktop:app-audio-frame", frame);
+    });
+    captureSidecarManager.onPcmFrame((frame: TAppAudioPcmFrame) => {
+      if (!appAudioFrameEgressPort) {
+        return;
+      }
+
+      const { pcm } = frame;
+      try {
+        appAudioFrameEgressPort.postMessage(
+          {
+            sessionId: frame.sessionId,
+            targetId: frame.targetId,
+            sequence: frame.sequence,
+            sampleRate: frame.sampleRate,
+            channels: frame.channels,
+            frameCount: frame.frameCount,
+            protocolVersion: frame.protocolVersion,
+            droppedFrameCount: frame.droppedFrameCount,
+            pcmBuffer: pcm.buffer,
+            pcmByteOffset: pcm.byteOffset,
+            pcmByteLength: pcm.byteLength,
+          }
+        );
+      } catch {
+        try {
+          appAudioFrameEgressPort.close();
+        } catch {
+          // ignore
+        }
+        appAudioFrameEgressPort.removeAllListeners();
+        appAudioFrameEgressPort = undefined;
+      }
     });
     captureSidecarManager.onStatus((event) => {
       mainWindow?.webContents.send("desktop:app-audio-status", event);
@@ -441,6 +502,16 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  if (appAudioFrameEgressPort) {
+    try {
+      appAudioFrameEgressPort.close();
+    } catch {
+      // ignore
+    }
+    appAudioFrameEgressPort.removeAllListeners();
+    appAudioFrameEgressPort = undefined;
+  }
+
   if (voiceFilterFrameIngressPort) {
     try {
       voiceFilterFrameIngressPort.close();

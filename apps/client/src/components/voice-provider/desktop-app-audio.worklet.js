@@ -6,9 +6,19 @@ class PcmQueueProcessor extends AudioWorkletProcessor {
       1,
       options.processorOptions?.targetChunks || 4
     );
+    this.trimStartChunks = Math.max(
+      this.targetChunks + 1,
+      options.processorOptions?.trimStartChunks || this.targetChunks * 2
+    );
     this.maxChunks = Math.max(1, options.processorOptions?.maxChunks || 8);
     this.trimQueueForLowLatency =
       options.processorOptions?.trimQueueForLowLatency !== false;
+    this.emitQueueTelemetry = options.processorOptions?.emitQueueTelemetry === true;
+    this.telemetryIntervalSeconds = Math.max(
+      0.25,
+      (options.processorOptions?.queueTelemetryIntervalMs || 1000) / 1000
+    );
+    this.lastTelemetryAt = -Infinity;
     this.queue = [];
     this.currentChunk = null;
     this.chunkFrameOffset = 0;
@@ -23,9 +33,11 @@ class PcmQueueProcessor extends AudioWorkletProcessor {
           this.overflownChunks += 1;
         }
 
-        while (this.trimQueueForLowLatency && this.queue.length >= this.targetChunks) {
-          this.queue.shift();
-          this.trimmedChunks += 1;
+        if (this.trimQueueForLowLatency && this.queue.length >= this.trimStartChunks) {
+          while (this.queue.length >= this.targetChunks) {
+            this.queue.shift();
+            this.trimmedChunks += 1;
+          }
         }
 
         if (this.trimmedChunks > 0 && this.trimmedChunks % 10 === 0) {
@@ -103,6 +115,33 @@ class PcmQueueProcessor extends AudioWorkletProcessor {
         this.currentChunk = null;
         this.chunkFrameOffset = 0;
       }
+    }
+
+    if (
+      this.emitQueueTelemetry &&
+      currentTime - this.lastTelemetryAt >= this.telemetryIntervalSeconds
+    ) {
+      let queuedFrames = 0;
+      for (let index = 0; index < this.queue.length; index += 1) {
+        queuedFrames += this.queue[index].length / this.channels;
+      }
+
+      if (this.currentChunk) {
+        queuedFrames +=
+          this.currentChunk.length / this.channels - this.chunkFrameOffset;
+      }
+
+      this.port.postMessage({
+        type: 'queue-stats',
+        queueDepthChunks: this.queue.length + (this.currentChunk ? 1 : 0),
+        queuedFrames,
+        targetChunks: this.targetChunks,
+        trimStartChunks: this.trimStartChunks,
+        maxChunks: this.maxChunks,
+        trimmedChunks: this.trimmedChunks,
+        droppedChunks: this.overflownChunks
+      });
+      this.lastTelemetryAt = currentTime;
     }
 
     return true;

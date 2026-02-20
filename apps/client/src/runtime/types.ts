@@ -79,6 +79,18 @@ export type TAppAudioFrame = {
   droppedFrameCount?: number;
 };
 
+export type TAppAudioPcmFrame = {
+  sessionId: string;
+  targetId: string;
+  sequence: number;
+  sampleRate: number;
+  channels: number;
+  frameCount: number;
+  pcm: Float32Array;
+  protocolVersion: number;
+  droppedFrameCount?: number;
+};
+
 export type TAppAudioEndReason =
   | 'capture_stopped'
   | 'app_exited'
@@ -213,7 +225,9 @@ export type TDesktopBridge = {
   ) => Promise<TGlobalPushKeybindRegistrationResult>;
   pushVoiceFilterPcmFrame: (frame: TVoiceFilterPcmFrame) => void;
   pushVoiceFilterFrame: (frame: TVoiceFilterFrame) => void;
-  subscribeAppAudioFrames: (cb: (frame: TAppAudioFrame) => void) => () => void;
+  subscribeAppAudioFrames: (
+    cb: (frame: TAppAudioFrame | TAppAudioPcmFrame) => void
+  ) => () => void;
   subscribeAppAudioStatus: (
     cb: (statusEvent: TAppAudioStatusEvent) => void
   ) => () => void;
