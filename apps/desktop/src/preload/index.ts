@@ -24,6 +24,7 @@ const APP_AUDIO_CHANNEL_RECONNECT_MAX_DELAY_MS = 2_000;
 const APP_AUDIO_CHANNEL_WATCHDOG_INTERVAL_MS = 2_000;
 const APP_AUDIO_CHANNEL_STALL_TIMEOUT_MS = 8_000;
 const VOICE_FILTER_CHANNEL_INIT_TIMEOUT_MS = 3_000;
+const VOICE_FILTER_DEBUG_LOG_PREFIX = "[voice-filter-debug]";
 const appAudioFrameSubscribers = new Set<
   (frame: TAppAudioFrame | TAppAudioPcmFrame) => void
 >();
@@ -416,6 +417,9 @@ const ensureVoiceFilterFrameChannel = (): Promise<boolean> => {
 
       voiceFilterFramePort = port;
       voiceFilterFramePort.onmessageerror = () => {
+        console.warn(
+          `${VOICE_FILTER_DEBUG_LOG_PREFIX} Voice-filter MessagePort message error; resetting channel`,
+        );
         voiceFilterFramePort = undefined;
       };
 
@@ -424,6 +428,8 @@ const ensureVoiceFilterFrameChannel = (): Promise<boolean> => {
       } catch {
         // ignore unsupported start() implementations
       }
+
+      console.warn(`${VOICE_FILTER_DEBUG_LOG_PREFIX} Voice-filter MessagePort ready`);
 
       voiceFilterFramePortPromise = undefined;
       resolve(true);
@@ -440,6 +446,9 @@ const ensureVoiceFilterFrameChannel = (): Promise<boolean> => {
         onPortReady,
       );
       voiceFilterFramePortPromise = undefined;
+      console.warn(
+        `${VOICE_FILTER_DEBUG_LOG_PREFIX} Timed out waiting for voice-filter MessagePort`,
+      );
       resolve(false);
     }, VOICE_FILTER_CHANNEL_INIT_TIMEOUT_MS);
     ipcRenderer.once("desktop:voice-filter-frame-channel-ready", onPortReady);
@@ -499,6 +508,9 @@ const desktopBridge = {
     if (voiceFilterFramePort) {
       const { pcm } = frame;
       try {
+        const pcmCopy = new Float32Array(pcm.length);
+        pcmCopy.set(pcm);
+
         voiceFilterFramePort.postMessage(
           {
             sessionId: frame.sessionId,
@@ -507,14 +519,14 @@ const desktopBridge = {
             channels: frame.channels,
             frameCount: frame.frameCount,
             protocolVersion: frame.protocolVersion,
-            pcmBuffer: pcm.buffer,
-            pcmByteOffset: pcm.byteOffset,
-            pcmByteLength: pcm.byteLength,
+            pcmSamples: pcmCopy,
           },
-          [pcm.buffer],
         );
         return;
       } catch {
+        console.warn(
+          `${VOICE_FILTER_DEBUG_LOG_PREFIX} Failed to post PCM frame via MessagePort; switching to JSON fallback`,
+        );
         voiceFilterFramePort = undefined;
       }
     }

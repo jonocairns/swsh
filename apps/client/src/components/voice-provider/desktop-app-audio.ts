@@ -1,7 +1,7 @@
 import type {
   TAppAudioSession
 } from '@/runtime/types';
-import desktopAppAudioWorkletModuleUrl from './desktop-app-audio.worklet.js?url';
+import desktopAppAudioWorkletModuleUrl from './desktop-app-audio.worklet.js?url&no-inline';
 import {
   computeRecoverableMissingFrameCount,
   isPcmFrame,

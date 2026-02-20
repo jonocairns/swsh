@@ -41,6 +41,64 @@ const RENDERER_URL = process.env.ELECTRON_RENDERER_URL;
 let mainWindow: BrowserWindow | null = null;
 let appAudioFrameEgressPort: MessagePortMain | undefined;
 let voiceFilterFrameIngressPort: MessagePortMain | undefined;
+const VOICE_FILTER_INGRESS_DROP_LOG_RATE_LIMIT_MS = 2_000;
+let nextVoiceFilterIngressDropLogAt = 0;
+
+const logVoiceFilterIngressDrop = (
+  reason: string,
+  details?: Record<string, unknown>,
+): void => {
+  const now = Date.now();
+  if (now < nextVoiceFilterIngressDropLogAt) {
+    return;
+  }
+
+  nextVoiceFilterIngressDropLogAt = now + VOICE_FILTER_INGRESS_DROP_LOG_RATE_LIMIT_MS;
+  console.warn("[voice-filter-debug] Dropping voice-filter ingress frame", {
+    reason,
+    ...(details || {}),
+  });
+};
+
+const disposeAppAudioFrameEgressPort = (
+  port: MessagePortMain | undefined = appAudioFrameEgressPort,
+): void => {
+  if (!port) {
+    return;
+  }
+
+  if (appAudioFrameEgressPort === port) {
+    appAudioFrameEgressPort = undefined;
+  }
+
+  try {
+    port.close();
+  } catch {
+    // ignore
+  }
+
+  port.removeAllListeners();
+};
+
+const disposeVoiceFilterFrameIngressPort = (
+  port: MessagePortMain | undefined = voiceFilterFrameIngressPort,
+): void => {
+  if (!port) {
+    return;
+  }
+
+  if (voiceFilterFrameIngressPort === port) {
+    voiceFilterFrameIngressPort = undefined;
+  }
+
+  try {
+    port.close();
+  } catch {
+    // ignore
+  }
+
+  port.removeAllListeners();
+};
 
 if (process.platform === "win32") {
   app.setAppUserModelId("com.sharkord.desktop");
@@ -242,14 +300,7 @@ const registerIpcHandlers = () => {
 
   ipcMain.on("desktop:open-app-audio-frame-channel", (event: IpcMainEvent) => {
     const { port1, port2 } = new MessageChannelMain();
-    if (appAudioFrameEgressPort) {
-      try {
-        appAudioFrameEgressPort.close();
-      } catch {
-        // ignore
-      }
-      appAudioFrameEgressPort.removeAllListeners();
-    }
+    disposeAppAudioFrameEgressPort();
 
     appAudioFrameEgressPort = port2;
     port2.on("close", () => {
@@ -265,14 +316,7 @@ const registerIpcHandlers = () => {
 
   ipcMain.on("desktop:open-voice-filter-frame-channel", (event: IpcMainEvent) => {
     const { port1, port2 } = new MessageChannelMain();
-    if (voiceFilterFrameIngressPort) {
-      try {
-        voiceFilterFrameIngressPort.close();
-      } catch {
-        // ignore
-      }
-      voiceFilterFrameIngressPort.removeAllListeners();
-    }
+    disposeVoiceFilterFrameIngressPort();
     voiceFilterFrameIngressPort = port2;
 
     port2.on("message", (portEvent) => {
@@ -284,6 +328,7 @@ const registerIpcHandlers = () => {
             channels?: unknown;
             frameCount?: unknown;
             protocolVersion?: unknown;
+            pcmSamples?: unknown;
             pcmBuffer?: unknown;
             pcmByteOffset?: unknown;
             pcmByteLength?: unknown;
@@ -301,10 +346,34 @@ const registerIpcHandlers = () => {
         channels,
         frameCount,
         protocolVersion,
+        pcmSamples,
         pcmBuffer,
         pcmByteOffset,
         pcmByteLength,
       } = data;
+
+      let pcm: Float32Array | undefined;
+      let pcmSampleCount: number | undefined;
+
+      const pcmBufferSource =
+        pcmBuffer instanceof ArrayBuffer
+          ? {
+              buffer: pcmBuffer as ArrayBufferLike,
+              baseByteOffset: 0,
+              byteLength: pcmBuffer.byteLength,
+            }
+          : ArrayBuffer.isView(pcmBuffer)
+            ? {
+                buffer: pcmBuffer.buffer,
+                baseByteOffset: pcmBuffer.byteOffset,
+                byteLength: pcmBuffer.byteLength,
+              }
+            : undefined;
+
+      const hasPcmSamplesPayload =
+        pcmSamples instanceof Float32Array ||
+        ArrayBuffer.isView(pcmSamples) ||
+        Array.isArray(pcmSamples);
 
       if (
         typeof sessionId !== "string" ||
@@ -312,26 +381,124 @@ const registerIpcHandlers = () => {
         typeof sampleRate !== "number" ||
         typeof channels !== "number" ||
         typeof frameCount !== "number" ||
-        !(pcmBuffer instanceof ArrayBuffer)
+        !hasPcmSamplesPayload &&
+          !pcmBufferSource
       ) {
+        logVoiceFilterIngressDrop("invalid_header_or_buffer_type", {
+          sessionIdType: typeof sessionId,
+          sequenceType: typeof sequence,
+          sampleRateType: typeof sampleRate,
+          channelsType: typeof channels,
+          frameCountType: typeof frameCount,
+          pcmSamplesType:
+            pcmSamples === null
+              ? "null"
+              : Array.isArray(pcmSamples)
+                ? "array"
+                : typeof pcmSamples,
+          pcmSamplesCtor:
+            pcmSamples &&
+            typeof pcmSamples === "object" &&
+            "constructor" in pcmSamples
+              ? (
+                  pcmSamples as {
+                    constructor?: { name?: unknown };
+                  }
+                ).constructor?.name
+              : undefined,
+          pcmBufferType:
+            pcmBuffer === null
+              ? "null"
+              : Array.isArray(pcmBuffer)
+                ? "array"
+                : typeof pcmBuffer,
+          pcmBufferCtor:
+            pcmBuffer && typeof pcmBuffer === "object" && "constructor" in pcmBuffer
+              ? (
+                  pcmBuffer as {
+                    constructor?: { name?: unknown };
+                  }
+                ).constructor?.name
+              : undefined,
+        });
         return;
       }
 
-      const byteOffset =
-        typeof pcmByteOffset === "number" && Number.isInteger(pcmByteOffset)
-          ? pcmByteOffset
-          : 0;
-      const byteLength =
-        typeof pcmByteLength === "number" && Number.isInteger(pcmByteLength)
-          ? pcmByteLength
-          : pcmBuffer.byteLength;
+      const expectedSampleCount = frameCount * channels;
 
-      if (
-        byteOffset < 0 ||
-        byteLength <= 0 ||
-        byteOffset + byteLength > pcmBuffer.byteLength ||
-        byteLength % Float32Array.BYTES_PER_ELEMENT !== 0
-      ) {
+      if (pcmSamples instanceof Float32Array) {
+        pcm = new Float32Array(pcmSamples);
+        pcmSampleCount = pcm.length;
+      } else if (ArrayBuffer.isView(pcmSamples)) {
+        const sampleView = new Float32Array(
+          pcmSamples.buffer,
+          pcmSamples.byteOffset,
+          Math.floor(pcmSamples.byteLength / Float32Array.BYTES_PER_ELEMENT),
+        );
+        pcm = new Float32Array(sampleView);
+        pcmSampleCount = pcm.length;
+      } else if (Array.isArray(pcmSamples)) {
+        pcm = Float32Array.from(pcmSamples);
+        pcmSampleCount = pcm.length;
+      }
+
+      if (!pcm) {
+        if (!pcmBufferSource) {
+          logVoiceFilterIngressDrop("missing_pcm_payload", {
+            sessionId,
+            sequence,
+          });
+          return;
+        }
+
+        const relativeByteOffset =
+          typeof pcmByteOffset === "number" && Number.isInteger(pcmByteOffset)
+            ? pcmByteOffset
+            : 0;
+        const byteLength =
+          typeof pcmByteLength === "number" && Number.isInteger(pcmByteLength)
+            ? pcmByteLength
+            : pcmBufferSource.byteLength;
+
+        if (
+          relativeByteOffset < 0 ||
+          byteLength <= 0 ||
+          relativeByteOffset + byteLength > pcmBufferSource.byteLength ||
+          byteLength % Float32Array.BYTES_PER_ELEMENT !== 0
+        ) {
+          logVoiceFilterIngressDrop("invalid_pcm_bounds", {
+            relativeByteOffset,
+            byteLength,
+            pcmBufferByteLength: pcmBufferSource.byteLength,
+          });
+          return;
+        }
+
+        const absoluteByteOffset = pcmBufferSource.baseByteOffset + relativeByteOffset;
+        try {
+          const pcmBytes = new Uint8Array(
+            pcmBufferSource.buffer,
+            absoluteByteOffset,
+            byteLength,
+          );
+          const alignedPcmBytes = new Uint8Array(byteLength);
+          alignedPcmBytes.set(pcmBytes);
+          pcm = new Float32Array(alignedPcmBytes.buffer);
+        } catch (error) {
+          logVoiceFilterIngressDrop("failed_to_construct_pcm_view", {
+            absoluteByteOffset,
+            byteLength,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return;
+        }
+      }
+
+      if (pcmSampleCount !== undefined && pcmSampleCount !== expectedSampleCount) {
+        logVoiceFilterIngressDrop("invalid_pcm_samples_length", {
+          expectedSampleCount,
+          actualSampleCount: pcmSampleCount,
+        });
         return;
       }
 
@@ -342,11 +509,7 @@ const registerIpcHandlers = () => {
         channels,
         frameCount,
         protocolVersion: typeof protocolVersion === "number" ? protocolVersion : 1,
-        pcm: new Float32Array(
-          pcmBuffer,
-          byteOffset,
-          byteLength / Float32Array.BYTES_PER_ELEMENT,
-        ),
+        pcm,
       };
 
       captureSidecarManager.pushVoiceFilterPcmFrame(frame);
@@ -433,13 +596,14 @@ void app
       mainWindow?.webContents.send("desktop:app-audio-frame", frame);
     });
     captureSidecarManager.onPcmFrame((frame: TAppAudioPcmFrame) => {
-      if (!appAudioFrameEgressPort) {
+      const egressPort = appAudioFrameEgressPort;
+      if (!egressPort) {
         return;
       }
 
       const { pcm } = frame;
       try {
-        appAudioFrameEgressPort.postMessage(
+        egressPort.postMessage(
           {
             sessionId: frame.sessionId,
             targetId: frame.targetId,
@@ -455,13 +619,7 @@ void app
           }
         );
       } catch {
-        try {
-          appAudioFrameEgressPort.close();
-        } catch {
-          // ignore
-        }
-        appAudioFrameEgressPort.removeAllListeners();
-        appAudioFrameEgressPort = undefined;
+        disposeAppAudioFrameEgressPort(egressPort);
       }
     });
     captureSidecarManager.onStatus((event) => {
@@ -502,25 +660,8 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  if (appAudioFrameEgressPort) {
-    try {
-      appAudioFrameEgressPort.close();
-    } catch {
-      // ignore
-    }
-    appAudioFrameEgressPort.removeAllListeners();
-    appAudioFrameEgressPort = undefined;
-  }
-
-  if (voiceFilterFrameIngressPort) {
-    try {
-      voiceFilterFrameIngressPort.close();
-    } catch {
-      // ignore
-    }
-    voiceFilterFrameIngressPort.removeAllListeners();
-    voiceFilterFrameIngressPort = undefined;
-  }
+  disposeAppAudioFrameEgressPort();
+  disposeVoiceFilterFrameIngressPort();
 
   desktopUpdater.dispose();
   void captureSidecarManager.dispose();

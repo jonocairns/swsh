@@ -66,7 +66,10 @@ const TARGET_CHANNELS: usize = 2;
 const FRAME_SIZE: usize = 960;
 const PROTOCOL_VERSION: u32 = 1;
 const PCM_ENCODING: &str = "f32le_base64";
+const APP_AUDIO_BINARY_EGRESS_FRAMING: &str = "length_prefixed_f32le_v1";
 const VOICE_FILTER_BINARY_FRAMING: &str = "length_prefixed_f32le_v1";
+#[cfg(windows)]
+const MAX_APP_AUDIO_BINARY_FRAME_BYTES: usize = 4 * 1024 * 1024;
 const MAX_VOICE_FILTER_BINARY_FRAME_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
@@ -309,6 +312,14 @@ struct VoiceFilterSession {
 }
 
 #[derive(Debug)]
+struct AppAudioBinaryEgress {
+    port: u16,
+    stream: Arc<Mutex<Option<TcpStream>>>,
+    stop_flag: Arc<AtomicBool>,
+    handle: JoinHandle<()>,
+}
+
+#[derive(Debug)]
 struct VoiceFilterBinaryIngress {
     port: u16,
     stop_flag: Arc<AtomicBool>,
@@ -503,6 +514,98 @@ fn enqueue_frame_event(
         params,
     }) {
         queue.push_line(serialized);
+    }
+}
+
+#[cfg(windows)]
+fn try_write_app_audio_binary_frame(
+    stream_slot: &Arc<Mutex<Option<TcpStream>>>,
+    session_id: &str,
+    target_id: &str,
+    sequence: u64,
+    sample_rate: usize,
+    channels: usize,
+    frame_count: usize,
+    protocol_version: u32,
+    dropped_frame_count: u32,
+    frame_samples: &[f32],
+) -> bool {
+    let session_id_bytes = session_id.as_bytes();
+    let target_id_bytes = target_id.as_bytes();
+
+    if session_id_bytes.is_empty() || session_id_bytes.len() > u16::MAX as usize {
+        return false;
+    }
+    if target_id_bytes.is_empty() || target_id_bytes.len() > u16::MAX as usize {
+        return false;
+    }
+    if sample_rate == 0 || sample_rate > u32::MAX as usize {
+        return false;
+    }
+    if channels == 0 || channels > u16::MAX as usize {
+        return false;
+    }
+    if frame_count == 0 || frame_count > u32::MAX as usize {
+        return false;
+    }
+    if frame_samples.is_empty() || frame_samples.len() % channels != 0 {
+        return false;
+    }
+
+    let pcm_bytes = bytemuck::cast_slice(frame_samples);
+    if pcm_bytes.is_empty() || pcm_bytes.len() > u32::MAX as usize {
+        return false;
+    }
+
+    let payload_len =
+        2 + // session id length
+        session_id_bytes.len() +
+        2 + // target id length
+        target_id_bytes.len() +
+        8 + // sequence
+        4 + // sample rate
+        2 + // channels
+        4 + // frame count
+        4 + // protocol version
+        4 + // dropped frame count
+        4 + // pcm byte length
+        pcm_bytes.len();
+
+    if payload_len == 0 || payload_len > MAX_APP_AUDIO_BINARY_FRAME_BYTES {
+        return false;
+    }
+
+    let mut packet = Vec::with_capacity(4 + payload_len);
+    packet.extend_from_slice(&(payload_len as u32).to_le_bytes());
+    packet.extend_from_slice(&(session_id_bytes.len() as u16).to_le_bytes());
+    packet.extend_from_slice(session_id_bytes);
+    packet.extend_from_slice(&(target_id_bytes.len() as u16).to_le_bytes());
+    packet.extend_from_slice(target_id_bytes);
+    packet.extend_from_slice(&sequence.to_le_bytes());
+    packet.extend_from_slice(&(sample_rate as u32).to_le_bytes());
+    packet.extend_from_slice(&(channels as u16).to_le_bytes());
+    packet.extend_from_slice(&(frame_count as u32).to_le_bytes());
+    packet.extend_from_slice(&protocol_version.to_le_bytes());
+    packet.extend_from_slice(&dropped_frame_count.to_le_bytes());
+    packet.extend_from_slice(&(pcm_bytes.len() as u32).to_le_bytes());
+    packet.extend_from_slice(pcm_bytes);
+
+    let mut lock = match stream_slot.lock() {
+        Ok(lock) => lock,
+        Err(_) => return false,
+    };
+
+    let Some(stream) = lock.as_mut() else {
+        return false;
+    };
+
+    match stream.write_all(&packet) {
+        Ok(()) => true,
+        Err(error) => {
+            eprintln!("[capture-sidecar] app-audio binary egress write failed: {error}");
+            *lock = None;
+            false
+        }
     }
 }
 
@@ -1385,6 +1488,7 @@ fn capture_loopback_audio(
     target_pid: u32,
     stop_flag: Arc<AtomicBool>,
     frame_queue: Arc<FrameQueue>,
+    app_audio_binary_stream: Option<Arc<Mutex<Option<TcpStream>>>>,
 ) -> CaptureOutcome {
     let process_handle = match open_process_for_liveness(target_pid) {
         Some(handle) => handle,
@@ -1504,18 +1608,38 @@ fn capture_loopback_audio(
                 while pending.len() >= FRAME_SIZE * TARGET_CHANNELS {
                     let frame_samples: Vec<f32> =
                         pending.drain(..FRAME_SIZE * TARGET_CHANNELS).collect();
-                    let frame_bytes = bytemuck::cast_slice(&frame_samples);
-                    let pcm_base64 = BASE64.encode(frame_bytes);
+                    let wrote_binary = app_audio_binary_stream
+                        .as_ref()
+                        .map(|stream_slot| {
+                            try_write_app_audio_binary_frame(
+                                stream_slot,
+                                session_id,
+                                target_id,
+                                sequence,
+                                TARGET_SAMPLE_RATE as usize,
+                                TARGET_CHANNELS,
+                                FRAME_SIZE,
+                                PROTOCOL_VERSION,
+                                0,
+                                &frame_samples,
+                            )
+                        })
+                        .unwrap_or(false);
 
-                    enqueue_frame_event(
-                        &frame_queue,
-                        session_id,
-                        target_id,
-                        sequence,
-                        TARGET_SAMPLE_RATE as usize,
-                        FRAME_SIZE,
-                        pcm_base64,
-                    );
+                    if !wrote_binary {
+                        let frame_bytes = bytemuck::cast_slice(&frame_samples);
+                        let pcm_base64 = BASE64.encode(frame_bytes);
+
+                        enqueue_frame_event(
+                            &frame_queue,
+                            session_id,
+                            target_id,
+                            sequence,
+                            TARGET_SAMPLE_RATE as usize,
+                            FRAME_SIZE,
+                            pcm_base64,
+                        );
+                    }
 
                     sequence = sequence.saturating_add(1);
                 }
@@ -1555,6 +1679,7 @@ fn capture_loopback_audio(
     _target_pid: u32,
     _stop_flag: Arc<AtomicBool>,
     _frame_queue: Arc<FrameQueue>,
+    _app_audio_binary_stream: Option<Arc<Mutex<Option<TcpStream>>>>,
 ) -> CaptureOutcome {
     CaptureOutcome::capture_error("Per-app audio capture is only available on Windows.".to_string())
 }
@@ -1562,6 +1687,7 @@ fn capture_loopback_audio(
 fn start_capture_thread(
     stdout: Arc<Mutex<io::Stdout>>,
     frame_queue: Arc<FrameQueue>,
+    app_audio_binary_stream: Option<Arc<Mutex<Option<TcpStream>>>>,
     session_id: String,
     target_id: String,
     target_pid: u32,
@@ -1574,6 +1700,7 @@ fn start_capture_thread(
             target_pid,
             Arc::clone(&stop_flag),
             Arc::clone(&frame_queue),
+            app_audio_binary_stream.clone(),
         );
 
         let mut ended_params = json!({
@@ -1701,6 +1828,7 @@ fn stop_voice_filter_session(
 fn handle_audio_capture_start(
     stdout: Arc<Mutex<io::Stdout>>,
     frame_queue: Arc<FrameQueue>,
+    app_audio_binary_stream: Option<Arc<Mutex<Option<TcpStream>>>>,
     state: &mut SidecarState,
     params: Value,
 ) -> Result<Value, String> {
@@ -1748,6 +1876,7 @@ fn handle_audio_capture_start(
     let handle = start_capture_thread(
         stdout,
         frame_queue,
+        app_audio_binary_stream,
         session_id.clone(),
         target_id.clone(),
         target_pid,
@@ -2020,6 +2149,67 @@ fn handle_voice_filter_stop(
 
     Ok(json!({
         "stopped": true,
+        "protocolVersion": PROTOCOL_VERSION,
+    }))
+}
+
+fn start_app_audio_binary_egress() -> Result<AppAudioBinaryEgress, String> {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .map_err(|error| format!("Failed to bind app-audio binary egress listener: {error}"))?;
+    listener
+        .set_nonblocking(true)
+        .map_err(|error| format!("Failed to configure app-audio binary egress listener: {error}"))?;
+
+    let port = listener
+        .local_addr()
+        .map_err(|error| format!("Failed to read app-audio binary egress listener port: {error}"))?
+        .port();
+
+    let stream = Arc::new(Mutex::new(None::<TcpStream>));
+    let worker_stream = Arc::clone(&stream);
+    let stop_flag = Arc::new(AtomicBool::new(false));
+    let worker_stop_flag = Arc::clone(&stop_flag);
+
+    let handle = thread::spawn(move || {
+        while !worker_stop_flag.load(Ordering::Relaxed) {
+            match listener.accept() {
+                Ok((accepted_stream, _peer)) => {
+                    let _ = accepted_stream.set_nodelay(true);
+                    let _ = accepted_stream.set_write_timeout(Some(Duration::from_millis(15)));
+
+                    if let Ok(mut lock) = worker_stream.lock() {
+                        *lock = Some(accepted_stream);
+                    }
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(25));
+                }
+                Err(error) => {
+                    eprintln!("[capture-sidecar] app-audio binary egress accept error: {error}");
+                    thread::sleep(Duration::from_millis(100));
+                }
+            }
+        }
+
+        if let Ok(mut lock) = worker_stream.lock() {
+            *lock = None;
+        }
+    });
+
+    Ok(AppAudioBinaryEgress {
+        port,
+        stream,
+        stop_flag,
+        handle,
+    })
+}
+
+fn handle_audio_capture_binary_egress_info(
+    app_audio_binary_egress: &AppAudioBinaryEgress,
+) -> Result<Value, String> {
+    Ok(json!({
+        "port": app_audio_binary_egress.port,
+        "framing": APP_AUDIO_BINARY_EGRESS_FRAMING,
         "protocolVersion": PROTOCOL_VERSION,
     }))
 }
@@ -2301,6 +2491,19 @@ fn main() {
     let frame_queue = Arc::new(FrameQueue::new(50));
     let frame_writer = start_frame_writer(Arc::clone(&stdout), Arc::clone(&frame_queue));
     let state = Arc::new(Mutex::new(SidecarState::default()));
+    let app_audio_binary_egress = match start_app_audio_binary_egress() {
+        Ok(app_audio_binary_egress) => {
+            eprintln!(
+                "[capture-sidecar] app-audio binary egress listening on 127.0.0.1:{}",
+                app_audio_binary_egress.port
+            );
+            Some(app_audio_binary_egress)
+        }
+        Err(error) => {
+            eprintln!("[capture-sidecar] app-audio binary egress unavailable: {error}");
+            None
+        }
+    };
     let binary_ingress = match start_voice_filter_binary_ingress(
         Arc::clone(&frame_queue),
         Arc::clone(&state),
@@ -2343,6 +2546,12 @@ fn main() {
             "capabilities.get" => handle_capabilities_get(),
             "windows.resolve_source" => handle_windows_resolve_source(request.params),
             "audio_targets.list" => handle_audio_targets_list(request.params),
+            "audio_capture.binary_egress_info" => match app_audio_binary_egress.as_ref() {
+                Some(app_audio_binary_egress) => {
+                    handle_audio_capture_binary_egress_info(app_audio_binary_egress)
+                }
+                None => Err("Binary app-audio egress is unavailable".to_string()),
+            },
             "voice_filter.binary_ingress_info" => match binary_ingress.as_ref() {
                 Some(binary_ingress) => handle_voice_filter_binary_ingress_info(binary_ingress),
                 None => Err("Binary voice filter ingress is unavailable".to_string()),
@@ -2351,6 +2560,9 @@ fn main() {
                 Ok(mut state_lock) => handle_audio_capture_start(
                     Arc::clone(&request_stdout),
                     request_frame_queue,
+                    app_audio_binary_egress
+                        .as_ref()
+                        .map(|binary_egress| Arc::clone(&binary_egress.stream)),
                     &mut state_lock,
                     request.params,
                 ),
@@ -2397,6 +2609,13 @@ fn main() {
                 request.method, error
             );
         }
+    }
+
+    if let Some(app_audio_binary_egress) = app_audio_binary_egress {
+        app_audio_binary_egress
+            .stop_flag
+            .store(true, Ordering::Relaxed);
+        let _ = app_audio_binary_egress.handle.join();
     }
 
     if let Some(binary_ingress) = binary_ingress {

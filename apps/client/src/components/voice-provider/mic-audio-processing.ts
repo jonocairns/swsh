@@ -6,7 +6,7 @@ import type {
 } from '@/runtime/types';
 import { VoiceFilterStrength } from '@/types';
 import { createDesktopAppAudioPipeline } from './desktop-app-audio';
-import micCaptureWorkletModuleUrl from './mic-capture.worklet.js?url';
+import micCaptureWorkletModuleUrl from './mic-capture.worklet.js?url&no-inline';
 
 type TMicAudioProcessingBackend = 'sidecar-native';
 
@@ -27,6 +27,7 @@ type TCreateMicAudioProcessingPipelineInput = {
 };
 
 const MIC_CAPTURE_WORKLET_NAME = 'sharkord-mic-capture-processor';
+const FIRST_FILTERED_FRAME_TIMEOUT_MS = 4_000;
 
 const getScriptProcessorBufferSize = (preferredFrameSize: number): number => {
   const clamped = Math.max(256, Math.min(16_384, Math.floor(preferredFrameSize)));
@@ -72,6 +73,13 @@ const createNativeDesktopMicAudioProcessingPipeline = async ({
     autoGainControl,
     echoCancellation
   });
+  console.warn('[voice-filter-debug] Started native voice-filter session', {
+    sessionId: session.sessionId,
+    sampleRate: session.sampleRate,
+    channels: session.channels,
+    framesPerBuffer: session.framesPerBuffer,
+    protocolVersion: session.protocolVersion
+  });
 
   const outputPipeline = await createDesktopAppAudioPipeline({
     sessionId: session.sessionId,
@@ -109,8 +117,40 @@ const createNativeDesktopMicAudioProcessingPipeline = async ({
   let processorNode: ScriptProcessorNode | undefined;
   const sinkNode = captureContext.createGain();
   sinkNode.gain.value = 0;
+  let hasReceivedFilteredFrame = false;
+  let settleFirstFilteredFrame: ((error?: Error) => void) | undefined;
+  const firstFilteredFramePromise = new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const timeout = window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      reject(
+        new Error(`Native voice filter produced no frames (session=${session.sessionId})`)
+      );
+    }, FIRST_FILTERED_FRAME_TIMEOUT_MS);
+
+    settleFirstFilteredFrame = (error?: Error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      window.clearTimeout(timeout);
+
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    };
+  });
 
   let sequence = 0;
+  let hasSentInputFrame = false;
 
   const removeFrameSubscription = desktopBridge.subscribeVoiceFilterFrames(
     (frame: TVoiceFilterFrame) => {
@@ -122,6 +162,17 @@ const createNativeDesktopMicAudioProcessingPipeline = async ({
         ...frame,
         targetId: 'native-mic-filter'
       });
+
+      if (!hasReceivedFilteredFrame) {
+        hasReceivedFilteredFrame = true;
+        console.warn('[voice-filter-debug] Received first processed voice-filter frame', {
+          sessionId: frame.sessionId,
+          sequence: frame.sequence,
+          frameCount: frame.frameCount,
+          channels: frame.channels
+        });
+        settleFirstFilteredFrame?.();
+      }
     }
   );
 
@@ -133,6 +184,18 @@ const createNativeDesktopMicAudioProcessingPipeline = async ({
 
       if (statusEvent.reason !== 'capture_stopped') {
         console.warn('[voice-filter] Native voice filter session ended', statusEvent);
+        if (statusEvent.error) {
+          console.warn(
+            '[voice-filter-debug] Native voice filter status error detail',
+            statusEvent.error
+          );
+        }
+      }
+
+      if (!hasReceivedFilteredFrame) {
+        settleFirstFilteredFrame?.(
+          new Error(`Native voice filter ended before frames (${statusEvent.reason})`)
+        );
       }
     }
   );
@@ -140,6 +203,17 @@ const createNativeDesktopMicAudioProcessingPipeline = async ({
   const pushInterleavedPcmFrame = (samples: Float32Array, frameCount: number) => {
     if (frameCount <= 0) {
       return;
+    }
+
+    if (!hasSentInputFrame) {
+      hasSentInputFrame = true;
+      console.warn('[voice-filter-debug] Sending first PCM frame to sidecar', {
+        sessionId: session.sessionId,
+        sequence,
+        frameCount,
+        channels: session.channels,
+        sampleRate: session.sampleRate
+      });
     }
 
     desktopBridge.pushVoiceFilterPcmFrame({
@@ -252,7 +326,7 @@ const createNativeDesktopMicAudioProcessingPipeline = async ({
     // ignore unsupported contentHint implementations
   }
 
-  return {
+  const pipeline: TMicAudioProcessingPipeline = {
     stream: outputPipeline.stream,
     track: outputPipeline.track,
     backend: 'sidecar-native',
@@ -304,6 +378,15 @@ const createNativeDesktopMicAudioProcessingPipeline = async ({
       await captureContext.close();
     }
   };
+
+  try {
+    await firstFilteredFramePromise;
+  } catch (error) {
+    await pipeline.destroy();
+    throw error;
+  }
+
+  return pipeline;
 };
 
 const createMicAudioProcessingPipeline = async ({
@@ -320,27 +403,42 @@ const createMicAudioProcessingPipeline = async ({
     return undefined;
   }
 
-  const inputSettings = inputTrack.getSettings();
-  const outputChannels = Math.max(
-    1,
-    Math.min(
-      2,
-      typeof inputSettings.channelCount === 'number'
-        ? inputSettings.channelCount
-        : 1
-    )
-  );
-
   try {
     return await createNativeDesktopMicAudioProcessingPipeline({
       inputTrack,
-      channels: outputChannels,
+      // Force mono for sidecar filter sessions to reduce runtime edge cases.
+      channels: 1,
       suppressionLevel,
       noiseSuppression,
       autoGainControl,
       echoCancellation
     });
   } catch (error) {
+    if (noiseSuppression) {
+      try {
+        const fallbackPipeline = await createNativeDesktopMicAudioProcessingPipeline({
+          inputTrack,
+          channels: 1,
+          suppressionLevel,
+          noiseSuppression: false,
+          autoGainControl,
+          echoCancellation
+        });
+
+        if (fallbackPipeline) {
+          console.warn(
+            '[voice-filter] Native filter fallback enabled without DeepFilter noise suppression'
+          );
+          return fallbackPipeline;
+        }
+      } catch (fallbackError) {
+        console.warn(
+          '[voice-filter] Native filter fallback (passthrough) failed, using raw mic',
+          fallbackError
+        );
+      }
+    }
+
     console.warn(
       '[voice-filter] Native desktop voice filter unavailable, using raw mic',
       error
