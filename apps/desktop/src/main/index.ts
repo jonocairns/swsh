@@ -25,6 +25,7 @@ import {
 } from "./screen-share";
 import { getServerUrl, setServerUrl } from "./settings-store";
 import { desktopUpdater } from "./updater";
+import { classifyWindowOpenUrl } from "./window-open-policy";
 import type {
   TAppAudioPcmFrame,
   TDesktopPushKeybindEvent,
@@ -162,8 +163,33 @@ const createMainWindow = () => {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    const policy = classifyWindowOpenUrl(url);
+
+    if (policy.action === "allow") {
+      return {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          icon,
+          autoHideMenuBar: true,
+          backgroundColor: "#000000",
+        },
+      };
+    }
+
+    if (policy.openExternal) {
+      void shell.openExternal(url);
+    }
+
     return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("did-create-window", (childWindow, details) => {
+    if (!details.url.startsWith("about:blank")) {
+      return;
+    }
+
+    childWindow.setAutoHideMenuBar(true);
+    childWindow.setMenuBarVisibility(false);
   });
 
   if (RENDERER_URL) {

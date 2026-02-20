@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>ripcord</h1>
+  <img src="./logo.png" alt="ripcord logo" width="160" />
   <p><strong>A lightweight, self-hosted real-time communication platform</strong></p>
 </div>
 
