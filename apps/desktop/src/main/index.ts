@@ -23,6 +23,7 @@ import {
 } from "./screen-share";
 import { getServerUrl, setServerUrl } from "./settings-store";
 import { desktopUpdater } from "./updater";
+import { classifyWindowOpenUrl } from "./window-open-policy";
 import type {
   TDesktopPushKeybindEvent,
   TDesktopPushKeybindsInput,
@@ -59,6 +60,14 @@ const setGlobalPushKeybinds = async (
   input?: TDesktopPushKeybindsInput,
 ): Promise<TGlobalPushKeybindRegistrationResult> => {
   return await captureSidecarManager.setPushKeybinds(input || {});
+};
+
+const normalizeExperimentalRustCapture = (value: unknown): boolean => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  return true;
 };
 
 const getEffectiveDesktopCapabilities = async (
@@ -101,7 +110,16 @@ const createMainWindow = () => {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    const policy = classifyWindowOpenUrl(url);
+
+    if (policy.action === "allow") {
+      return { action: "allow" };
+    }
+
+    if (policy.openExternal) {
+      void shell.openExternal(url);
+    }
+
     return { action: "deny" };
   });
 
@@ -187,8 +205,12 @@ const registerIpcHandlers = () => {
   ipcMain.handle(
     "desktop:get-capabilities",
     (_event: IpcMainInvokeEvent, options?: { experimentalRustCapture?: boolean }) => {
+      const experimentalRustCapture = normalizeExperimentalRustCapture(
+        options?.experimentalRustCapture,
+      );
+
       return getEffectiveDesktopCapabilities(
-        options?.experimentalRustCapture ?? true,
+        experimentalRustCapture,
       );
     },
   );
@@ -263,8 +285,12 @@ const registerIpcHandlers = () => {
   ipcMain.handle(
     "desktop:prepare-screen-share",
     async (_event: IpcMainInvokeEvent, selection: TScreenShareSelection) => {
+      const experimentalRustCapture = normalizeExperimentalRustCapture(
+        selection.experimentalRustCapture,
+      );
+
       const capabilities = await getEffectiveDesktopCapabilities(
-        selection.experimentalRustCapture ?? true,
+        experimentalRustCapture,
       );
       let resolved = resolveScreenAudioMode(
         selection.audioMode,
