@@ -1,3 +1,5 @@
+import micCaptureWorkletModuleUrl from './mic-capture.worklet.js?url&no-inline';
+
 type TMicReferenceAudioPipeline = {
   updateStreams: (streams: MediaStream[]) => void;
   destroy: () => Promise<void>;
@@ -10,15 +12,12 @@ type TCreateMicReferenceAudioPipelineInput = {
   onFrame: (samples: Float32Array, frameCount: number) => void;
 };
 
-const getScriptProcessorBufferSize = (preferredFrameSize: number): number => {
-  const clamped = Math.max(256, Math.min(16_384, Math.floor(preferredFrameSize)));
-  let size = 256;
+const MIC_REFERENCE_CAPTURE_WORKLET_NAME = 'sharkord-mic-capture-processor';
 
-  while (size < clamped && size < 16_384) {
-    size *= 2;
-  }
-
-  return size;
+const ensureMicReferenceCaptureWorkletModule = async (
+  audioContext: AudioContext
+) => {
+  await audioContext.audioWorklet.addModule(micCaptureWorkletModuleUrl);
 };
 
 const createMicReferenceAudioPipeline = async ({
@@ -45,14 +44,7 @@ const createMicReferenceAudioPipeline = async ({
   });
   const mixNode = audioContext.createGain();
   mixNode.gain.value = 1;
-  const scriptProcessorFrameSize = getScriptProcessorBufferSize(
-    normalizedTargetFrameSize
-  );
-  const processorNode = audioContext.createScriptProcessor(
-    scriptProcessorFrameSize,
-    outputChannels,
-    outputChannels
-  );
+  let workletNode: AudioWorkletNode;
   const sinkNode = audioContext.createGain();
   sinkNode.gain.value = 0;
   const pendingChunks: Float32Array[] = [];
@@ -60,37 +52,12 @@ const createMicReferenceAudioPipeline = async ({
   let pendingFrameOffset = 0;
   let sourceNodes: MediaStreamAudioSourceNode[] = [];
 
-  processorNode.onaudioprocess = (event) => {
-    const inputBuffer = event.inputBuffer;
-    const outputBuffer = event.outputBuffer;
-    const frameCount = inputBuffer.length;
-
-    for (let channelIndex = 0; channelIndex < outputBuffer.numberOfChannels; channelIndex += 1) {
-      outputBuffer.getChannelData(channelIndex).fill(0);
-    }
-
+  const appendInterleavedChunk = (chunk: Float32Array, frameCount: number) => {
     if (frameCount <= 0) {
       return;
     }
 
-    const interleaved = new Float32Array(frameCount * outputChannels);
-
-    for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-      for (let channelIndex = 0; channelIndex < outputChannels; channelIndex += 1) {
-        const sourceChannelIndex = Math.min(
-          channelIndex,
-          Math.max(0, inputBuffer.numberOfChannels - 1)
-        );
-        const sourceChannelData =
-          inputBuffer.numberOfChannels > 0
-            ? inputBuffer.getChannelData(sourceChannelIndex)
-            : undefined;
-        interleaved[frameIndex * outputChannels + channelIndex] =
-          sourceChannelData?.[frameIndex] ?? 0;
-      }
-    }
-
-    pendingChunks.push(interleaved);
+    pendingChunks.push(chunk);
     pendingTotalFrames += frameCount;
 
     while (pendingTotalFrames >= normalizedTargetFrameSize) {
@@ -130,8 +97,57 @@ const createMicReferenceAudioPipeline = async ({
     }
   };
 
-  mixNode.connect(processorNode);
-  processorNode.connect(sinkNode);
+  if (
+    typeof AudioWorkletNode === 'undefined' ||
+    typeof audioContext.audioWorklet === 'undefined'
+  ) {
+    await audioContext.close();
+    return undefined;
+  }
+
+  try {
+    await ensureMicReferenceCaptureWorkletModule(audioContext);
+
+    workletNode = new AudioWorkletNode(
+      audioContext,
+      MIC_REFERENCE_CAPTURE_WORKLET_NAME,
+      {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [outputChannels],
+        processorOptions: {
+          channels: outputChannels,
+          targetFrameSize: normalizedTargetFrameSize
+        }
+      }
+    );
+  } catch (error) {
+    console.warn(
+      '[voice-filter] AudioWorklet mic reference capture unavailable',
+      error
+    );
+    await audioContext.close();
+    return undefined;
+  }
+
+  workletNode.port.onmessage = (messageEvent) => {
+    const data = messageEvent.data;
+    if (!data || data.type !== 'pcm' || !data.samples) {
+      return;
+    }
+
+    const samples = data.samples as Float32Array;
+    const frameCount =
+      typeof data.frameCount === 'number'
+        ? Math.floor(data.frameCount)
+        : Math.floor(samples.length / outputChannels);
+
+    appendInterleavedChunk(samples, frameCount);
+  };
+
+  mixNode.connect(workletNode);
+  workletNode.connect(sinkNode);
+
   sinkNode.connect(audioContext.destination);
 
   if (audioContext.state !== 'running') {
@@ -171,7 +187,14 @@ const createMicReferenceAudioPipeline = async ({
   return {
     updateStreams,
     destroy: async () => {
-      processorNode.onaudioprocess = null;
+      try {
+        workletNode.port.onmessage = null;
+        workletNode.port.postMessage({
+          type: 'reset'
+        });
+      } catch {
+        // ignore
+      }
 
       sourceNodes.forEach((sourceNode) => {
         try {
@@ -189,7 +212,7 @@ const createMicReferenceAudioPipeline = async ({
       }
 
       try {
-        processorNode.disconnect();
+        workletNode.disconnect();
       } catch {
         // ignore
       }
