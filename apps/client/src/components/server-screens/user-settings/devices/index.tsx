@@ -32,7 +32,12 @@ import {
   updateDesktopServerUrl
 } from '@/runtime/server-config';
 import { ScreenAudioMode, type TDesktopUpdateStatus } from '@/runtime/types';
-import { Resolution, VideoCodecPreference, VoiceFilterStrength } from '@/types';
+import {
+  MicQualityMode,
+  Resolution,
+  VideoCodecPreference,
+  VoiceFilterStrength
+} from '@/types';
 import { Info } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -329,6 +334,28 @@ const Devices = memo(() => {
             </Select>
           </div>
 
+          <div className="max-w-sm space-y-2">
+            <Label>Mic quality mode</Label>
+            <Select
+              onValueChange={(value) =>
+                onChange('micQualityMode', value as MicQualityMode)
+              }
+              value={values.micQualityMode}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select mic quality mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={MicQualityMode.AUTO}>
+                    Auto (recommended)
+                  </SelectItem>
+                  <SelectItem value={MicQualityMode.MANUAL}>Custom</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
             <div className="flex items-center justify-between gap-3">
               <Label className="cursor-default">Echo cancellation</Label>
@@ -337,6 +364,7 @@ const Devices = memo(() => {
                 onCheckedChange={(checked) =>
                   onChange('echoCancellation', checked)
                 }
+                disabled={values.micQualityMode === MicQualityMode.AUTO}
               />
             </div>
 
@@ -347,6 +375,7 @@ const Devices = memo(() => {
                 onCheckedChange={(checked) =>
                   onChange('noiseSuppression', checked)
                 }
+                disabled={values.micQualityMode === MicQualityMode.AUTO}
               />
             </div>
 
@@ -357,6 +386,7 @@ const Devices = memo(() => {
                 onCheckedChange={(checked) =>
                   onChange('autoGainControl', checked)
                 }
+                disabled={values.micQualityMode === MicQualityMode.AUTO}
               />
             </div>
 
@@ -369,7 +399,10 @@ const Devices = memo(() => {
                 onCheckedChange={(checked) =>
                   onChange('experimentalVoiceFilter', checked)
                 }
-                disabled={!hasDesktopBridge}
+                disabled={
+                  !hasDesktopBridge ||
+                  values.micQualityMode === MicQualityMode.AUTO
+                }
               />
             </div>
           </div>
@@ -389,7 +422,11 @@ const Devices = memo(() => {
                 onChange('voiceFilterStrength', value as VoiceFilterStrength)
               }
               value={values.voiceFilterStrength}
-              disabled={!hasDesktopBridge || !values.experimentalVoiceFilter}
+              disabled={
+                !hasDesktopBridge ||
+                values.micQualityMode === MicQualityMode.AUTO ||
+                !values.experimentalVoiceFilter
+              }
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a filter preset" />

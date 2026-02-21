@@ -14,7 +14,7 @@ import {
 } from '@trpc/server/adapters/ws';
 import { eq } from 'drizzle-orm';
 import http from 'http';
-import { WebSocketServer, type WebSocket } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import { config } from '../config';
 import { db } from '../db';
 import { getAllChannelUserPermissions } from '../db/queries/channels';
@@ -36,6 +36,18 @@ type TTrackedWebSocket = WebSocket & { userId?: number; token: string };
 const getTrackedClients = () => {
   if (!wss) return [] as TTrackedWebSocket[];
   return Array.from(wss.clients) as TTrackedWebSocket[];
+};
+
+const hasOtherOpenUserConnection = (
+  userId: number,
+  currentWs: TTrackedWebSocket
+) => {
+  return getTrackedClients().some(
+    (client) =>
+      client !== currentWs &&
+      client.userId === userId &&
+      client.readyState === WebSocket.OPEN
+  );
 };
 
 const usersIpMap = new Map<number, string>();
@@ -148,10 +160,10 @@ const createContext = async ({
   const setWsUserId = (userId: number) => {
     if (!wss) return;
 
-    const ws = getTrackedClients().find((client) => client.token === token);
-
-    if (ws) {
-      ws.userId = userId;
+    for (const ws of getTrackedClients()) {
+      if (ws.token === token) {
+        ws.userId = userId;
+      }
     }
   };
 
@@ -254,6 +266,14 @@ const createWsServer = async (server: http.Server) => {
         const user = await getUserByToken(trackedWs.token);
 
         if (!user) return;
+
+        if (hasOtherOpenUserConnection(user.id, trackedWs)) {
+          logger.debug(
+            '%s disconnected from one session, but is still connected elsewhere',
+            user.name
+          );
+          return;
+        }
 
         const voiceRuntime = VoiceRuntime.findRuntimeByUserId(user.id);
 
