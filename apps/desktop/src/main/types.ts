@@ -166,6 +166,7 @@ export type TDesktopUpdateStatus = {
   state: TDesktopUpdateState;
   currentVersion: string;
   availableVersion?: string;
+  manualInstallRequired?: boolean;
   checkedAtIso?: string;
   percent?: number;
   bytesPerSecond?: number;
@@ -199,4 +200,10 @@ export type TGlobalPushKeybindRegistrationResult = {
   talkRegistered: boolean;
   muteRegistered: boolean;
   errors: string[];
+};
+
+export type TMicDevice = { id: string; label: string };
+export type TMicDevicesResult = { devices: TMicDevice[] };
+export type TStartVoiceFilterWithCaptureInput = TStartVoiceFilterInput & {
+  deviceId?: string;
 };

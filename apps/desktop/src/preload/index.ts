@@ -9,9 +9,11 @@ import type {
   TDesktopUpdateStatus,
   TGlobalPushKeybindRegistrationResult,
   TDesktopAppAudioTargetsResult,
+  TMicDevicesResult,
   TScreenShareSelection,
   TStartAppAudioCaptureInput,
   TStartVoiceFilterInput,
+  TStartVoiceFilterWithCaptureInput,
   TVoiceFilterFrame,
   TVoiceFilterPcmFrame,
   TVoiceFilterSession,
@@ -492,6 +494,12 @@ const desktopBridge = {
     ipcRenderer.invoke("desktop:stop-app-audio-capture", sessionId).finally(() => {
       trackAppAudioCaptureStop(sessionId);
     }),
+  listMicDevices: (): Promise<TMicDevicesResult> =>
+    ipcRenderer.invoke("desktop:list-mic-devices"),
+  startVoiceFilterSessionWithCapture: (
+    input: TStartVoiceFilterWithCaptureInput,
+  ): Promise<TVoiceFilterSession> =>
+    ipcRenderer.invoke("desktop:start-voice-filter-with-capture", input),
   startVoiceFilterSession: (
     input: TStartVoiceFilterInput,
   ): Promise<TVoiceFilterSession> =>
@@ -513,6 +521,7 @@ const desktopBridge = {
 
         voiceFilterFramePort.postMessage(
           {
+            frameKind: "mic",
             sessionId: frame.sessionId,
             sequence: frame.sequence,
             sampleRate: frame.sampleRate,
@@ -534,6 +543,40 @@ const desktopBridge = {
     void ensureVoiceFilterFrameChannel();
     ipcRenderer.send(
       "desktop:push-voice-filter-frame",
+      toFallbackVoiceFilterFrame(frame),
+    );
+  },
+  pushVoiceFilterReferencePcmFrame: (frame: TVoiceFilterPcmFrame): void => {
+    if (voiceFilterFramePort) {
+      const { pcm } = frame;
+      try {
+        const pcmCopy = new Float32Array(pcm.length);
+        pcmCopy.set(pcm);
+
+        voiceFilterFramePort.postMessage(
+          {
+            frameKind: "reference",
+            sessionId: frame.sessionId,
+            sequence: frame.sequence,
+            sampleRate: frame.sampleRate,
+            channels: frame.channels,
+            frameCount: frame.frameCount,
+            protocolVersion: frame.protocolVersion,
+            pcmSamples: pcmCopy,
+          },
+        );
+        return;
+      } catch {
+        console.warn(
+          `${VOICE_FILTER_DEBUG_LOG_PREFIX} Failed to post reference PCM frame via MessagePort; switching to JSON fallback`,
+        );
+        voiceFilterFramePort = undefined;
+      }
+    }
+
+    void ensureVoiceFilterFrameChannel();
+    ipcRenderer.send(
+      "desktop:push-voice-filter-reference-frame",
       toFallbackVoiceFilterFrame(frame),
     );
   },

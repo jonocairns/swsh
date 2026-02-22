@@ -12,13 +12,15 @@ import type {
   TDesktopPushKeybindEvent,
   TDesktopPushKeybindsInput,
   TGlobalPushKeybindRegistrationResult,
+  TMicDevicesResult,
   TStartAppAudioCaptureInput,
   TStartVoiceFilterInput,
+  TStartVoiceFilterWithCaptureInput,
   TVoiceFilterFrame,
   TVoiceFilterPcmFrame,
   TVoiceFilterSession,
   TVoiceFilterStatusEvent,
-} from "./types.js";
+} from "./types";
 
 type TSidecarResponse = {
   id: string;
@@ -212,7 +214,7 @@ class CaptureSidecarManager {
   private lastVoiceFilterSidecarJsonError: string | undefined;
   private appAudioBinaryEgressSocket: Socket | undefined;
   private appAudioBinaryEgressConnectPromise: Promise<void> | undefined;
-  private appAudioBinaryEgressReadBuffer = Buffer.alloc(0);
+  private appAudioBinaryEgressReadBuffer: Buffer = Buffer.alloc(0);
   private appAudioBinarySessionIds = new Set<string>();
   private nextAppAudioBinaryEgressRetryAt = 0;
   private appAudioBinaryEgressUnsupported = false;
@@ -452,6 +454,35 @@ class CaptureSidecarManager {
     return session;
   }
 
+  async listMicDevices(): Promise<TMicDevicesResult> {
+    const response = await this.sendRequest("mic_devices.list", {});
+    return response as TMicDevicesResult;
+  }
+
+  async startVoiceFilterSessionWithCapture(
+    input: TStartVoiceFilterWithCaptureInput,
+  ): Promise<TVoiceFilterSession> {
+    const response = await this.sendRequest("voice_filter.start_with_capture", input);
+    const session = response as TVoiceFilterSession;
+    this.activeVoiceFilterSessionId = session.sessionId;
+    this.forceVoiceFilterJsonFallback = false;
+    this.hasLoggedVoiceFilterInputFrame = false;
+    this.hasLoggedVoiceFilterOutputFrame = false;
+    this.hasConnectedVoiceFilterBinarySocketSinceSessionStart = false;
+    this.hasAcceptedVoiceFilterBinaryPushSinceSessionStart = false;
+    this.lastVoiceFilterBinaryPushFailureReason = undefined;
+    this.voiceFilterJsonFallbackPushCount = 0;
+    this.voiceFilterJsonFallbackErrorCount = 0;
+    this.lastVoiceFilterSidecarBinaryError = undefined;
+    this.lastVoiceFilterSidecarJsonError = undefined;
+    if (ENABLE_BINARY_VOICE_FILTER_INGRESS) {
+      void this.ensureVoiceFilterBinaryIngress().catch((error) => {
+        console.warn("[desktop] Failed to initialize binary voice filter ingress", error);
+      });
+    }
+    return session;
+  }
+
   async stopVoiceFilterSession(sessionId?: string): Promise<void> {
     const targetSessionId = sessionId || this.activeVoiceFilterSessionId;
 
@@ -491,6 +522,16 @@ class CaptureSidecarManager {
         error instanceof Error ? error.message : String(error);
       console.warn("[desktop] Failed to push voice filter frame", error);
     });
+  }
+
+  pushVoiceFilterReferenceFrame(frame: TVoiceFilterFrame): void {
+    void this.sendNotification("voice_filter.push_reference_frame", frame).catch((error) => {
+      console.warn("[desktop] Failed to push voice filter reference frame", error);
+    });
+  }
+
+  pushVoiceFilterReferencePcmFrame(frame: TVoiceFilterPcmFrame): void {
+    this.pushVoiceFilterReferenceFrame(this.toBase64VoiceFilterFrame(frame));
   }
 
   pushVoiceFilterPcmFrame(frame: TVoiceFilterPcmFrame): void {
@@ -946,6 +987,20 @@ class CaptureSidecarManager {
         }
 
         this.events.emit("voice-filter-status", statusEvent);
+        return;
+      }
+
+      if (parsedLine.event === "mic_capture.status") {
+        const { rawModeEnabled, rawModeStatus, sessionId } = parsedLine.params as {
+          rawModeEnabled: boolean;
+          rawModeStatus: string;
+          sessionId: string;
+        };
+        console.warn("[voice-filter-debug] Mic capture raw mode status", {
+          sessionId,
+          rawModeEnabled,
+          rawModeStatus,
+        });
         return;
       }
 

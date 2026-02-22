@@ -5,6 +5,8 @@ import { memo, type ReactNode, useCallback, useEffect, useMemo, useState } from 
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 
+const MANUAL_UPDATE_URL = 'https://github.com/jonocairns/ripcord/releases';
+
 type TCalloutContent = {
   title: string;
   description: string;
@@ -54,8 +56,19 @@ const resolveCalloutContent = (
   }
 
   if (status.state === 'error' && status.message) {
+    if (status.manualInstallRequired) {
+      return {
+        title: 'Install update manually',
+        description: status.availableVersion
+          ? `Version ${status.availableVersion} is available. Automatic install wasn't available on this machine.`
+          : "Automatic install wasn't available on this machine.",
+        icon: <Download className="h-4 w-4 text-amber-500" />,
+        toneClassName: 'bg-card'
+      };
+    }
+
     return {
-      title: 'Update failed',
+      title: 'Update unavailable',
       description: status.message,
       icon: <AlertTriangle className="h-4 w-4 text-red-500" />,
       toneClassName: 'bg-card'
@@ -141,6 +154,10 @@ const DesktopUpdateCallout = memo(() => {
     return resolveCalloutContent(status);
   }, [status]);
 
+  const handleOpenManualInstall = useCallback(() => {
+    window.open(MANUAL_UPDATE_URL, '_blank', 'noopener,noreferrer');
+  }, []);
+
   if (!status || !calloutContent) {
     return null;
   }
@@ -170,6 +187,17 @@ const DesktopUpdateCallout = memo(() => {
             disabled={installingUpdate}
           >
             {installingUpdate ? 'Restarting...' : 'Restart to Update'}
+          </Button>
+        )}
+
+        {status.state === 'error' && status.manualInstallRequired && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2 w-full"
+            onClick={handleOpenManualInstall}
+          >
+            Open Releases
           </Button>
         )}
       </div>

@@ -34,6 +34,7 @@ import type {
   TScreenShareSelection,
   TStartAppAudioCaptureInput,
   TStartVoiceFilterInput,
+  TStartVoiceFilterWithCaptureInput,
   TVoiceFilterFrame,
   TVoiceFilterPcmFrame,
 } from "./types";
@@ -310,6 +311,16 @@ const registerIpcHandlers = () => {
     },
   );
 
+  ipcMain.handle("desktop:list-mic-devices", () =>
+    captureSidecarManager.listMicDevices(),
+  );
+
+  ipcMain.handle(
+    "desktop:start-voice-filter-with-capture",
+    (_event, input: TStartVoiceFilterWithCaptureInput) =>
+      captureSidecarManager.startVoiceFilterSessionWithCapture(input),
+  );
+
   ipcMain.handle(
     "desktop:set-global-push-keybinds",
     async (_event, input?: TDesktopPushKeybindsInput) => {
@@ -321,6 +332,13 @@ const registerIpcHandlers = () => {
     "desktop:push-voice-filter-frame",
     (_event: IpcMainEvent, frame: TVoiceFilterFrame) => {
       captureSidecarManager.pushVoiceFilterFrame(frame);
+    },
+  );
+
+  ipcMain.on(
+    "desktop:push-voice-filter-reference-frame",
+    (_event: IpcMainEvent, frame: TVoiceFilterFrame) => {
+      captureSidecarManager.pushVoiceFilterReferenceFrame(frame);
     },
   );
 
@@ -348,6 +366,7 @@ const registerIpcHandlers = () => {
     port2.on("message", (portEvent) => {
       const data = portEvent.data as
         | {
+            frameKind?: unknown;
             sessionId?: unknown;
             sequence?: unknown;
             sampleRate?: unknown;
@@ -366,6 +385,7 @@ const registerIpcHandlers = () => {
       }
 
       const {
+        frameKind,
         sessionId,
         sequence,
         sampleRate,
@@ -537,8 +557,12 @@ const registerIpcHandlers = () => {
         protocolVersion: typeof protocolVersion === "number" ? protocolVersion : 1,
         pcm,
       };
-
-      captureSidecarManager.pushVoiceFilterPcmFrame(frame);
+      const resolvedFrameKind = frameKind === "reference" ? "reference" : "mic";
+      if (resolvedFrameKind === "reference") {
+        captureSidecarManager.pushVoiceFilterReferencePcmFrame(frame);
+      } else {
+        captureSidecarManager.pushVoiceFilterPcmFrame(frame);
+      }
     });
 
     port2.on("close", () => {

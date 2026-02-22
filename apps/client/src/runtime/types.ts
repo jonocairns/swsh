@@ -164,6 +164,7 @@ export type TDesktopUpdateStatus = {
   state: TDesktopUpdateState;
   currentVersion: string;
   availableVersion?: string;
+  manualInstallRequired?: boolean;
   checkedAtIso?: string;
   percent?: number;
   bytesPerSecond?: number;
@@ -179,6 +180,12 @@ export type TStartVoiceFilterInput = {
   noiseSuppression: boolean;
   autoGainControl: boolean;
   echoCancellation: boolean;
+};
+
+export type TMicDevice = { id: string; label: string };
+export type TMicDevicesResult = { devices: TMicDevice[] };
+export type TStartVoiceFilterWithCaptureInput = TStartVoiceFilterInput & {
+  deviceId?: string;
 };
 
 export type TPushKeybindKind = 'talk' | 'mute';
@@ -215,6 +222,10 @@ export type TDesktopBridge = {
     input: TStartAppAudioCaptureInput
   ) => Promise<TAppAudioSession>;
   stopAppAudioCapture: (sessionId?: string) => Promise<void>;
+  listMicDevices: () => Promise<TMicDevicesResult>;
+  startVoiceFilterSessionWithCapture: (
+    input: TStartVoiceFilterWithCaptureInput
+  ) => Promise<TVoiceFilterSession>;
   startVoiceFilterSession: (
     input: TStartVoiceFilterInput
   ) => Promise<TVoiceFilterSession>;
@@ -224,6 +235,7 @@ export type TDesktopBridge = {
     input: TDesktopPushKeybindsInput
   ) => Promise<TGlobalPushKeybindRegistrationResult>;
   pushVoiceFilterPcmFrame: (frame: TVoiceFilterPcmFrame) => void;
+  pushVoiceFilterReferencePcmFrame: (frame: TVoiceFilterPcmFrame) => void;
   pushVoiceFilterFrame: (frame: TVoiceFilterFrame) => void;
   subscribeAppAudioFrames: (
     cb: (frame: TAppAudioFrame | TAppAudioPcmFrame) => void
