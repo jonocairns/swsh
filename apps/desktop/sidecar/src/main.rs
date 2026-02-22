@@ -936,14 +936,14 @@ fn voice_filter_config(strength: VoiceFilterStrength) -> VoiceFilterConfig {
             max_db_df_thresh: 18.0,
         },
         VoiceFilterStrength::High => VoiceFilterConfig {
-            post_filter_beta: 0.01,
+            post_filter_beta: 0.0,
             atten_lim_db: 45.0,
             min_db_thresh: -18.0,
             max_db_erb_thresh: 30.0,
             max_db_df_thresh: 15.0,
         },
         VoiceFilterStrength::Aggressive => VoiceFilterConfig {
-            post_filter_beta: 0.02,
+            post_filter_beta: 0.0,
             atten_lim_db: 55.0,
             min_db_thresh: -20.0,
             max_db_erb_thresh: 28.0,
