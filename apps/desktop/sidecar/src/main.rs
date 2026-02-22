@@ -2655,8 +2655,8 @@ fn handle_voice_filter_start_with_capture(
     let thread_queue = Arc::clone(&frame_queue);
 
     eprintln!(
-        "[capture-sidecar] voice_filter.start_with_capture session={} deviceId={:?}",
-        session_id, parsed.device_id
+        "[capture-sidecar] voice_filter.start_with_capture deviceId={:?}",
+        parsed.device_id
     );
 
     thread::spawn(move || {
