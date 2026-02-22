@@ -34,12 +34,13 @@ use windows::Win32::Foundation::{BOOL, HANDLE, HWND, LPARAM, WAIT_TIMEOUT};
 #[cfg(windows)]
 use windows::Win32::Media::Audio::{
     ActivateAudioInterfaceAsync, IActivateAudioInterfaceAsyncOperation,
-    IActivateAudioInterfaceCompletionHandler, IAudioCaptureClient, IAudioClient,
+    IActivateAudioInterfaceCompletionHandler, IAudioCaptureClient, IAudioClient, IAudioClient2,
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_E_INVALID_STREAM_FLAG, AUDCLNT_SHAREMODE_SHARED,
     AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, AUDCLNT_STREAMFLAGS_LOOPBACK,
     AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, AUDIOCLIENT_ACTIVATION_PARAMS,
     AUDIOCLIENT_ACTIVATION_PARAMS_0, AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
-    AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
+    AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS, AudioClientProperties,
+    AUDCLNT_STREAMOPTIONS_RAW, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
     VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, WAVEFORMATEX,
 };
 #[cfg(windows)]
@@ -93,6 +94,13 @@ const MIC_CAPTURE_FRAME_SIZE: usize = 480; // 10ms at 48kHz — matches DeepFilt
 const LIMITER_THRESHOLD: f32 = 0.95;
 const LIMITER_ATTACK_COEFF: f32 = 0.979_2; // exp(-1/48)
 const LIMITER_RELEASE_COEFF: f32 = 0.999_8; // exp(-1/4800)
+
+// Noise gate — applied per DeepFilterNet hop using the lsnr value returned by process().
+// lsnr > threshold → speech detected → gate opens; lsnr <= threshold → gate closes.
+// DeepFilterNet returns -15.0 for near-silence and positive values for clear speech.
+const GATE_LSNR_THRESHOLD: f32 = -3.0; // dB; tune upward to gate more aggressively
+const GATE_ATTACK_COEFF: f32 = 0.606_5; // exp(-1/2): ~20 ms to open (2 × 10 ms hops)
+const GATE_RELEASE_COEFF: f32 = 0.951_2; // exp(-1/20): ~200 ms time constant to close
 
 #[derive(Debug, Deserialize)]
 struct SidecarRequest {
@@ -377,6 +385,7 @@ struct VoiceFilterSession {
     echo_cancellation: bool,
     echo_reference_interleaved: VecDeque<f32>,
     limiter_gain: f32,
+    gate_gain: f32,
 }
 
 impl VoiceFilterSession {
@@ -961,6 +970,7 @@ fn create_voice_filter_session(
         echo_cancellation,
         echo_reference_interleaved: VecDeque::new(),
         limiter_gain: 1.0,
+        gate_gain: 0.0,
     })
 }
 
@@ -1131,6 +1141,10 @@ fn process_voice_filter_frame(
         }
     }
 
+    // Pull gate_gain out before the match to avoid a partial-borrow conflict
+    // with session.processor.  Written back after the match.
+    let mut gate_gain = session.gate_gain;
+
     match &mut session.processor {
         VoiceFilterProcessor::DeepFilter(processor) => {
             let hop_size = processor.hop_size;
@@ -1159,15 +1173,28 @@ fn process_voice_filter_frame(
                     }
                 }
 
-                processor
+                let lsnr = processor
                     .model
                     .process(noisy.view(), enhanced.view_mut())
                     .map_err(|error| format!("DeepFilterNet processing failed: {error}"))?;
 
+                // Noise gate: smooth the gate gain toward open (1.0) when the model
+                // reports speech (lsnr > threshold), or toward closed (0.0) otherwise.
+                // Attack is fast (~20 ms) so speech isn't clipped; release is slower
+                // (~200 ms) so word endings aren't cut off.
+                let target_gain = if lsnr > GATE_LSNR_THRESHOLD { 1.0_f32 } else { 0.0_f32 };
+                if target_gain > gate_gain {
+                    gate_gain = gate_gain * GATE_ATTACK_COEFF
+                        + target_gain * (1.0 - GATE_ATTACK_COEFF);
+                } else {
+                    gate_gain = gate_gain * GATE_RELEASE_COEFF
+                        + target_gain * (1.0 - GATE_RELEASE_COEFF);
+                }
+
                 for channel_index in 0..channels {
                     for sample_index in 0..hop_size {
                         processor.output_buffers[channel_index]
-                            .push_back(enhanced[(channel_index, sample_index)]);
+                            .push_back(enhanced[(channel_index, sample_index)] * gate_gain);
                     }
                 }
             }
@@ -1182,10 +1209,11 @@ fn process_voice_filter_frame(
                     }
                 }
             }
-
         }
         VoiceFilterProcessor::Passthrough => {}
     }
+
+    session.gate_gain = gate_gain;
 
     if session.echo_cancellation {
         apply_reference_echo_cancellation(session, samples);
@@ -2394,6 +2422,25 @@ fn capture_mic_audio(
                 .map_err(|error| format!("IMMDevice::Activate IAudioClient failed: {error}"))?
         };
 
+        // Request RAW mode to bypass Windows APOs (audio processing objects) such as
+        // noise suppression, equalisation, and other driver-level enhancements that
+        // would otherwise interfere with our own signal chain.  This is best-effort:
+        // some devices/Windows versions do not support raw mode, in which case we
+        // silently continue without it.
+        let raw_mode_result: Result<(), String> = match audio_client.cast::<IAudioClient2>() {
+            Err(error) => Err(format!("IAudioClient2 not available: {error}")),
+            Ok(audio_client2) => {
+                let props = AudioClientProperties {
+                    cbSize: std::mem::size_of::<AudioClientProperties>() as u32,
+                    bIsOffload: false.into(),
+                    eCategory: windows::Win32::Media::Audio::AudioCategory_Communications,
+                    Options: AUDCLNT_STREAMOPTIONS_RAW,
+                };
+                unsafe { audio_client2.SetClientProperties(&props) }
+                    .map_err(|error| format!("SetClientProperties failed: {error}"))
+            }
+        };
+
         let capture_format = WAVEFORMATEX {
             wFormatTag: 0x0003, // WAVE_FORMAT_IEEE_FLOAT
             nChannels: TARGET_CHANNELS as u16,
@@ -2428,6 +2475,23 @@ fn capture_mic_audio(
                 .Start()
                 .map_err(|error| format!("IAudioClient::Start failed: {error}"))?
         };
+
+        // Emit raw mode status as a sidecar event so the renderer can log it.
+        let raw_mode_status = match &raw_mode_result {
+            Ok(()) => "enabled".to_string(),
+            Err(reason) => format!("failed: {reason}"),
+        };
+        eprintln!("[sidecar] mic capture raw mode: {raw_mode_status}");
+        if let Ok(event_json) = serde_json::to_string(&SidecarEvent {
+            event: "mic_capture.status",
+            params: json!({
+                "sessionId": session_id,
+                "rawModeEnabled": raw_mode_result.is_ok(),
+                "rawModeStatus": raw_mode_status,
+            }),
+        }) {
+            frame_queue.push_line(event_json);
+        }
 
         let mut pending = Vec::<f32>::new();
         let mut sequence: u64 = 0;
@@ -2572,6 +2636,12 @@ fn handle_voice_filter_start_with_capture(
         auto_gain_control,
         echo_cancellation,
     )?;
+    // Native capture always sends MIC_CAPTURE_FRAME_SIZE frames per buffer,
+    // regardless of whether DeepFilterNet is active.  Report the actual size
+    // so the client pipeline can size its buffers correctly.
+    #[cfg(windows)]
+    let frames_per_buffer = MIC_CAPTURE_FRAME_SIZE;
+    #[cfg(not(windows))]
     let frames_per_buffer = voice_filter_frames_per_buffer(&session);
 
     state.voice_filter_session = Some(session);
@@ -2723,7 +2793,11 @@ fn process_voice_filter_samples(
         return Err("Voice filter frame sample count mismatch".to_string());
     }
 
-    apply_limiter(&mut samples, &mut session.limiter_gain);
+    // Limiter is only needed after DeepFilterNet to guard against model output peaks.
+    // In passthrough mode the raw signal should not be modified.
+    if matches!(session.processor, VoiceFilterProcessor::DeepFilter(_)) {
+        apply_limiter(&mut samples, &mut session.limiter_gain);
+    }
 
     let frame_bytes = bytemuck::cast_slice(&samples);
     let pcm_base64 = BASE64.encode(frame_bytes);

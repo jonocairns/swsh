@@ -990,6 +990,20 @@ class CaptureSidecarManager {
         return;
       }
 
+      if (parsedLine.event === "mic_capture.status") {
+        const { rawModeEnabled, rawModeStatus, sessionId } = parsedLine.params as {
+          rawModeEnabled: boolean;
+          rawModeStatus: string;
+          sessionId: string;
+        };
+        console.warn("[voice-filter-debug] Mic capture raw mode status", {
+          sessionId,
+          rawModeEnabled,
+          rawModeStatus,
+        });
+        return;
+      }
+
       if (parsedLine.event === "push_keybind.state") {
         const pushEvent = parsedLine.params as TDesktopPushKeybindEvent;
         if (pushEvent.kind !== "talk" && pushEvent.kind !== "mute") {
